@@ -1,0 +1,47 @@
+{
+  "name": "@fil-technology/appmate-mcp",
+  "version": "0.1.0",
+  "description": "Model Context Protocol server for AppMate — lets Claude / Cursor / Codex drive your retention flows via API tokens.",
+  "type": "module",
+  "bin": {
+    "appmate-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx src/index.ts",
+    "prepublishOnly": "npm run build",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.20.2",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fil-technology/appmate-mcp.git"
+  },
+  "homepage": "https://docs.appmate.cloud/api-reference",
+  "license": "MIT",
+  "keywords": [
+    "appmate",
+    "mcp",
+    "model-context-protocol",
+    "ai",
+    "claude",
+    "retention",
+    "subscription"
+  ]
+}

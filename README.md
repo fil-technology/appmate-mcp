@@ -1,0 +1,106 @@
+# appmate-mcp
+
+Model Context Protocol server for [AppMate](https://appmate.cloud) — lets
+Claude Desktop, Claude Code, Cursor, Codex, or any other MCP-aware client
+drive AppMate via typed tools. List apps, edit pre-cancel flows, publish,
+export waitlists — without leaving the chat.
+
+```bash
+npx -y @fil-technology/appmate-mcp
+```
+
+## Setup (1 minute)
+
+1. Issue a token at <https://flow.appmate.cloud/admin/api-tokens>. Copy the
+   `amk_…` string — it's only shown once.
+2. Add the server to your MCP host's config (examples below).
+3. Restart the host and ask your agent: *"list my appmate apps"*.
+
+### Claude Desktop / Claude Code
+
+Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (on
+macOS) or the equivalent on your platform:
+
+```json
+{
+  "mcpServers": {
+    "appmate": {
+      "command": "npx",
+      "args": ["-y", "@fil-technology/appmate-mcp"],
+      "env": {
+        "APPMATE_TOKEN": "amk_…",
+        "APPMATE_API_URL": "https://flow.appmate.cloud"
+      }
+    }
+  }
+}
+```
+
+### Cursor / Codex (`.mcp.json` in your project)
+
+```json
+{
+  "mcpServers": {
+    "appmate": {
+      "command": "npx",
+      "args": ["-y", "@fil-technology/appmate-mcp"],
+      "env": { "APPMATE_TOKEN": "amk_…" }
+    }
+  }
+}
+```
+
+`APPMATE_API_URL` defaults to `https://flow.appmate.cloud`. Override for
+staging or self-hosted instances.
+
+## Tools
+
+| Tool | Purpose |
+| --- | --- |
+| `list_apps` | List every app the token can see. |
+| `get_app` | Fetch one app by id or slug. |
+| `create_app` | Create a new app. |
+| `get_pre_cancel_flow` | Read published + draft pre-cancel config. |
+| `update_pre_cancel_draft` | Replace the draft with new config JSON. |
+| `publish_pre_cancel_flow` | Promote the draft live. |
+| `get_waitlist_flow` | Read published + draft waitlist config. |
+| `update_waitlist_draft` | Replace the waitlist draft. |
+| `publish_waitlist_flow` | Promote the waitlist draft live. |
+| `list_waitlist_signups` | Paginated list (cursor + nextCursor). |
+| `export_waitlist_csv` | Return the full waitlist as a CSV string. |
+
+Tools that accept an app reference (`get_app`, `update_pre_cancel_draft`,
+etc.) accept either the cuid `id` or the human-readable `slug` — use
+whichever you have. The full REST shape is documented at
+<https://docs.appmate.cloud/api-reference>.
+
+## Example agent prompts
+
+> *"Create an AppMate app called `Ledgr` with bundle id
+> `com.acme.ledgr`, then publish a simple pre-cancel flow that offers a 20%
+> discount for the `too_expensive` reason."*
+
+> *"Export the waitlist for `appmate-pro` as CSV and save it to
+> `~/Downloads/waitlist.csv`."*
+
+> *"Compare the published and draft pre-cancel configs for `quakemate` and
+> tell me what changed."*
+
+## Local development
+
+```bash
+pnpm install
+pnpm dev    # tsx src/index.ts — talks MCP over stdio
+pnpm build  # emits dist/index.js
+```
+
+## Security
+
+- Tokens are bcrypt-hashed server-side and only shown once on creation.
+- Revoke from the dashboard the moment a token leaks.
+- All calls go over TLS to `flow.appmate.cloud`. No data sits on disk in
+  the MCP process beyond what your MCP host logs.
+
+## License
+
+MIT. See `LICENSE`.
