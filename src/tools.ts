@@ -91,16 +91,63 @@ export const getPreCancelFlow: ToolDef<
     ),
 };
 
-// We keep the config body as `z.unknown()` so the LLM can hand us any
-// pre-cancel JSON without hitting our (deliberately permissive) wrapper
-// schema first. The server validates strictly and returns the failing
-// paths if invalid.
+// Config body is `z.unknown()` so we hand the raw JSON to the server,
+// which has the canonical Zod schema. The server returns 422 with paths
+// on validation errors AND a `warnings` array on success for soft
+// mismatches (e.g. showThanksScreen + a "Contact support" label).
 export const updatePreCancelDraft: ToolDef<
   z.ZodObject<{ appIdOrSlug: z.ZodString; config: z.ZodUnknown }>
 > = {
   name: "update_pre_cancel_draft",
-  description:
-    "Replace the draft pre-cancel flow config. Body MUST be a full pre-cancel config object (type: 'pre_cancel'). The server validates strictly and returns 422 with the failing paths on mismatch.",
+  description: [
+    "Replace the draft pre-cancel flow config. Body MUST be a full pre-cancel config object (type: 'pre_cancel').",
+    "",
+    "Required shape (paste-and-fill):",
+    "  {",
+    "    type: 'pre_cancel',",
+    "    intro: { title, subtitle, primaryButton, secondaryButton },",
+    "    reasonScreen: {",
+    "      title, subtitle,",
+    "      reasons: [ { id: snake_case, label, iconName? (lucide name), emoji? (one char) } ],",
+    "      autoAdvance?: boolean,",
+    "      selectMode?: 'single' (default) | 'multi'   // multi skips response screens",
+    "    },",
+    "    responses: {",
+    "      <reasonId>: {",
+    "        title, body,",
+    "        primaryButton: { label, action, ...actionParams },",
+    "        secondaryButton?: { label, action, ...actionParams },",
+    "        showThanksScreen?: boolean       // true = no deep link, lands on thanks",
+    "      }",
+    "    },",
+    "    showBackButton?: boolean (default true)",
+    "  }",
+    "",
+    "Action types and their params:",
+    "  return_to_app                                     close flow, back to app",
+    "  manage_subscription                               open Apple subs UI (escape hatch)",
+    "  open_offer        { offerId: string }             iOS app applies a StoreKit promo",
+    "  open_premium      { paywallId?: string }          iOS paywall (optional variant id)",
+    "  open_support      { supportTopic?, message? }     iOS support inbox",
+    "  open_feature      { featureId: string }           deep-link an in-app screen",
+    "  external_url      { url: https://… }              open URL in browser",
+    "  none                                              record click, do nothing",
+    "",
+    "CRITICAL gotcha — showThanksScreen suppresses the deep link.",
+    "  Set showThanksScreen:true ONLY when the click itself IS the signal you want.",
+    "  Label the button feedback-shaped: 'Send feedback', 'Tell us why'.",
+    "  DO NOT pair showThanksScreen:true with destination-shaped labels like",
+    "  'Contact support', 'Claim 20% off', 'Open tutorial' — the user taps,",
+    "  lands on a generic thanks screen, and the promise the label made silently breaks.",
+    "",
+    "The server returns { ok:true, warnings: [...] } on success — ALWAYS check warnings",
+    "and re-PUT a corrected config before publishing if any are returned.",
+    "Common warning codes:",
+    "  thanks_screen_blocks_navigation, missing_response, responses_unused_in_multi_mode,",
+    "  placeholder_offer_id, placeholder_feature_id, placeholder_external_url",
+    "",
+    "See https://docs.appmate.cloud/ai-agents for the full do/don't guide and examples.",
+  ].join("\n"),
   inputSchema: z.object({
     appIdOrSlug: z.string().min(1),
     config: z.unknown(),
@@ -119,7 +166,7 @@ export const publishPreCancelFlow: ToolDef<
 > = {
   name: "publish_pre_cancel_flow",
   description:
-    "Promote the draft pre-cancel config to the live published version. The live cancel URL flips on success.",
+    "Promote the draft pre-cancel config to the live published version. The live cancel URL flips on success. ALWAYS review the warnings array returned from the most recent update_pre_cancel_draft call and fix any reported issues BEFORE publishing — publishing locks the broken flow in front of real users.",
   inputSchema: z.object({ appIdOrSlug: z.string().min(1) }),
   handler: (input, cfg) =>
     apiFetch(
@@ -149,8 +196,26 @@ export const updateWaitlistDraft: ToolDef<
   z.ZodObject<{ appIdOrSlug: z.ZodString; config: z.ZodUnknown }>
 > = {
   name: "update_waitlist_draft",
-  description:
-    "Replace the draft waitlist config. Body MUST be a full waitlist config object (type: 'waitlist'). Server validates strictly.",
+  description: [
+    "Replace the draft waitlist config. Body MUST be a full waitlist config object (type: 'waitlist').",
+    "",
+    "Required shape:",
+    "  {",
+    "    type: 'waitlist',",
+    "    intro: {",
+    "      title, subtitle,",
+    "      emailPlaceholder, submitLabel,",
+    "      legal? (small print, optional)",
+    "    },",
+    "    success: {",
+    "      title, body,",
+    "      ctaLabel?, ctaUrl?    // both-or-neither: ctaLabel without ctaUrl renders nothing",
+    "    }",
+    "  }",
+    "",
+    "Server returns { ok:true, warnings: [...] } — check warnings before publishing.",
+    "Common: partial_cta (label without url, or vice versa).",
+  ].join("\n"),
   inputSchema: z.object({
     appIdOrSlug: z.string().min(1),
     config: z.unknown(),
