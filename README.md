@@ -2,7 +2,7 @@
 
 Model Context Protocol server for [AppMate](https://appmate.cloud) — lets
 Claude Desktop, Claude Code, Cursor, Codex, or any other MCP-aware client
-drive AppMate via typed tools. List apps, edit pre-cancel flows, publish,
+drive AppMate via typed tools. List apps, edit cancel flows, publish,
 export waitlists — without leaving the chat.
 
 ```bash
@@ -60,16 +60,16 @@ staging or self-hosted instances.
 | `list_apps` | List every app the token can see. |
 | `get_app` | Fetch one app by id or slug. |
 | `create_app` | Create a new app. |
-| `get_pre_cancel_flow` | Read published + draft pre-cancel config. |
-| `update_pre_cancel_draft` | Replace the draft with new config JSON. |
-| `publish_pre_cancel_flow` | Promote the draft live. |
+| `get_cancel_flow` | Read published + draft cancel config. |
+| `update_cancel_draft` | Replace the draft with new config JSON. |
+| `publish_cancel_flow` | Promote the draft live. |
 | `get_waitlist_flow` | Read published + draft waitlist config. |
 | `update_waitlist_draft` | Replace the waitlist draft. |
 | `publish_waitlist_flow` | Promote the waitlist draft live. |
 | `list_waitlist_signups` | Paginated list (cursor + nextCursor). |
 | `export_waitlist_csv` | Return the full waitlist as a CSV string. |
 
-Tools that accept an app reference (`get_app`, `update_pre_cancel_draft`,
+Tools that accept an app reference (`get_app`, `update_cancel_draft`,
 etc.) accept either the cuid `id` or the human-readable `slug` — use
 whichever you have. The full REST shape is documented at
 <https://docs.appmate.cloud/api-reference>.
@@ -77,13 +77,13 @@ whichever you have. The full REST shape is documented at
 ## Example agent prompts
 
 > *"Create an AppMate app called `Ledgr` with bundle id
-> `com.acme.ledgr`, then publish a simple pre-cancel flow that offers a 20%
+> `com.acme.ledgr`, then publish a simple cancel flow that offers a 20%
 > discount for the `too_expensive` reason."*
 
 > *"Export the waitlist for `appmate-pro` as CSV and save it to
 > `~/Downloads/waitlist.csv`."*
 
-> *"Compare the published and draft pre-cancel configs for `quakemate` and
+> *"Compare the published and draft cancel configs for `quakemate` and
 > tell me what changed."*
 
 ## Local development

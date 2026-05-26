@@ -76,18 +76,18 @@ export const createApp: ToolDef<
 
 // ─── Pre-cancel flow ────────────────────────────────────────────────────────
 
-export const getPreCancelFlow: ToolDef<
+export const getCancelFlow: ToolDef<
   z.ZodObject<{ appIdOrSlug: z.ZodString }>
 > = {
-  name: "get_pre_cancel_flow",
+  name: "get_cancel_flow",
   description:
-    "Read the published and draft pre-cancel flow configs for an app.",
+    "Read the published and draft cancel flow configs for an app.",
   inputSchema: z.object({ appIdOrSlug: z.string().min(1) }),
   handler: (input, cfg) =>
     apiFetch(
       cfg,
       "GET",
-      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/flows/pre-cancel`,
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/flows/cancel`,
     ),
 };
 
@@ -95,16 +95,16 @@ export const getPreCancelFlow: ToolDef<
 // which has the canonical Zod schema. The server returns 422 with paths
 // on validation errors AND a `warnings` array on success for soft
 // mismatches (e.g. showThanksScreen + a "Contact support" label).
-export const updatePreCancelDraft: ToolDef<
+export const updateCancelDraft: ToolDef<
   z.ZodObject<{ appIdOrSlug: z.ZodString; config: z.ZodUnknown }>
 > = {
-  name: "update_pre_cancel_draft",
+  name: "update_cancel_draft",
   description: [
-    "Replace the draft pre-cancel flow config. Body MUST be a full pre-cancel config object (type: 'pre_cancel').",
+    "Replace the draft cancel flow config. Body MUST be a full cancel config object (type: 'cancel').",
     "",
     "Required shape (paste-and-fill):",
     "  {",
-    "    type: 'pre_cancel',",
+    "    type: 'cancel',",
     "    intro: { title, subtitle, primaryButton, secondaryButton },",
     "    reasonScreen: {",
     "      title, subtitle,",
@@ -156,23 +156,23 @@ export const updatePreCancelDraft: ToolDef<
     apiFetch(
       cfg,
       "PUT",
-      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/flows/pre-cancel`,
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/flows/cancel`,
       input.config,
     ),
 };
 
-export const publishPreCancelFlow: ToolDef<
+export const publishCancelFlow: ToolDef<
   z.ZodObject<{ appIdOrSlug: z.ZodString }>
 > = {
-  name: "publish_pre_cancel_flow",
+  name: "publish_cancel_flow",
   description:
-    "Promote the draft pre-cancel config to the live published version. The live cancel URL flips on success. ALWAYS review the warnings array returned from the most recent update_pre_cancel_draft call and fix any reported issues BEFORE publishing — publishing locks the broken flow in front of real users.",
+    "Promote the draft cancel config to the live published version. The live cancel URL flips on success. ALWAYS review the warnings array returned from the most recent update_cancel_draft call and fix any reported issues BEFORE publishing — publishing locks the broken flow in front of real users.",
   inputSchema: z.object({ appIdOrSlug: z.string().min(1) }),
   handler: (input, cfg) =>
     apiFetch(
       cfg,
       "POST",
-      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/flows/pre-cancel/publish`,
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/flows/cancel/publish`,
     ),
 };
 
@@ -295,12 +295,12 @@ export const ALL_TOOLS = [
   createApp,
   exportWaitlistCsv,
   getApp,
-  getPreCancelFlow,
+  getCancelFlow,
   getWaitlistFlow,
   listApps,
   listWaitlistSignups,
-  publishPreCancelFlow,
+  publishCancelFlow,
   publishWaitlistFlow,
-  updatePreCancelDraft,
+  updateCancelDraft,
   updateWaitlistDraft,
 ] as const;
