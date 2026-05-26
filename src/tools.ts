@@ -318,17 +318,242 @@ export const exportWaitlistCsv: ToolDef<
   },
 };
 
+// ─── Feedback flow ──────────────────────────────────────────────────────────
+
+export const getFeedbackFlow: ToolDef<
+  z.ZodObject<{ appIdOrSlug: z.ZodString }>
+> = {
+  name: "get_feedback_flow",
+  description:
+    "Read the published and draft feedback flow configs for an app. Feedback flows host an open-ended message form (optional 1–5 star rating + optional reply email) at appmate.cloud/feedback/{appSlug}.",
+  inputSchema: z.object({ appIdOrSlug: z.string().min(1) }),
+  handler: (input, cfg) =>
+    apiFetch(
+      cfg,
+      "GET",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/flows/feedback`,
+    ),
+};
+
+export const updateFeedbackDraft: ToolDef<
+  z.ZodObject<{ appIdOrSlug: z.ZodString; config: z.ZodUnknown }>
+> = {
+  name: "update_feedback_draft",
+  description: [
+    "Replace the draft feedback config. Body MUST be a full feedback config object (type: 'feedback').",
+    "",
+    "Shape:",
+    "  {",
+    "    type: 'feedback',",
+    "    intro: {",
+    "      title, subtitle,",
+    "      messagePlaceholder,           // textarea placeholder",
+    "      submitLabel,",
+    "      legal?                        // small print under the form (optional)",
+    "    },",
+    "    rating?: {                      // OPTIONAL 1–5 star widget",
+    "      enabled: true,",
+    "      prompt?: 'How would you rate your experience?',",
+    "      required?: false              // when true, blocks submit until picked",
+    "    },",
+    "    emailField?: {                  // OPTIONAL reply-to email field",
+    "      enabled: true,",
+    "      placeholder?: 'you@example.com (optional)',",
+    "      required?: false",
+    "    },",
+    "    success: {",
+    "      title, body,",
+    "      ctaLabel?, ctaUrl?            // both-or-neither follow-up CTA",
+    "    },",
+    "    hero?: {                        // visual treatment, matches waitlist hero",
+    "      theme?: 'minimal' | 'gradient' | 'dark' | 'side_by_side',",
+    "      eyebrow?, accentColor?, titleFont?",
+    "    }",
+    "  }",
+    "",
+    "Server returns { ok:true, warnings: [] }. Warning rules will be added later — for now treat any non-empty array as advisory.",
+  ].join("\n"),
+  inputSchema: z.object({
+    appIdOrSlug: z.string().min(1),
+    config: z.unknown(),
+  }),
+  handler: (input, cfg) =>
+    apiFetch(
+      cfg,
+      "PUT",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/flows/feedback`,
+      input.config,
+    ),
+};
+
+export const publishFeedbackFlow: ToolDef<
+  z.ZodObject<{ appIdOrSlug: z.ZodString }>
+> = {
+  name: "publish_feedback_flow",
+  description:
+    "Promote the draft feedback config to the live published version. Visitors at appmate.cloud/feedback/{appSlug} see the new version immediately.",
+  inputSchema: z.object({ appIdOrSlug: z.string().min(1) }),
+  handler: (input, cfg) =>
+    apiFetch(
+      cfg,
+      "POST",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/flows/feedback/publish`,
+    ),
+};
+
+export const listFeedbackSubmissions: ToolDef<
+  z.ZodObject<{
+    appIdOrSlug: z.ZodString;
+    limit: z.ZodOptional<z.ZodNumber>;
+    cursor: z.ZodOptional<z.ZodString>;
+  }>
+> = {
+  name: "list_feedback_submissions",
+  description:
+    "Paginated list of feedback submissions for an app. Each row: { id, message, rating, email, source, createdAt }. limit max 200, default 50; pass nextCursor back for the next page.",
+  inputSchema: z.object({
+    appIdOrSlug: z.string().min(1),
+    limit: z.number().int().min(1).max(200).optional(),
+    cursor: z.string().optional(),
+  }),
+  handler: (input, cfg) => {
+    const qs = new URLSearchParams();
+    if (input.limit !== undefined) qs.set("limit", String(input.limit));
+    if (input.cursor) qs.set("cursor", input.cursor);
+    const tail = qs.toString() ? `?${qs.toString()}` : "";
+    return apiFetch(
+      cfg,
+      "GET",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/feedback/submissions${tail}`,
+    );
+  },
+};
+
+// ─── Report flow ────────────────────────────────────────────────────────────
+
+export const getReportFlow: ToolDef<
+  z.ZodObject<{ appIdOrSlug: z.ZodString }>
+> = {
+  name: "get_report_flow",
+  description:
+    "Read the published and draft report flow configs for an app. Report flows host a categorised bug/abuse/spam form (required category picker + message + optional reply email) at appmate.cloud/report/{appSlug}.",
+  inputSchema: z.object({ appIdOrSlug: z.string().min(1) }),
+  handler: (input, cfg) =>
+    apiFetch(
+      cfg,
+      "GET",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/flows/report`,
+    ),
+};
+
+export const updateReportDraft: ToolDef<
+  z.ZodObject<{ appIdOrSlug: z.ZodString; config: z.ZodUnknown }>
+> = {
+  name: "update_report_draft",
+  description: [
+    "Replace the draft report config. Body MUST be a full report config object (type: 'report').",
+    "",
+    "Shape:",
+    "  {",
+    "    type: 'report',",
+    "    intro: {",
+    "      title, subtitle,",
+    "      messagePlaceholder,           // textarea placeholder",
+    "      submitLabel,",
+    "      legal?                        // optional small print",
+    "    },",
+    "    categories: [                   // REQUIRED 1–10 entries",
+    "      { id: 'bug',   label: 'Bug or crash',       emoji?: '🐞', hint?: '…' },",
+    "      { id: 'abuse', label: 'Harassment or abuse', emoji?: '🚫' },",
+    "      { id: 'spam',  label: 'Spam',                emoji?: '🧹' },",
+    "      { id: 'privacy', label: 'Privacy concern',   emoji?: '🔒' },",
+    "      { id: 'other', label: 'Something else',      emoji?: '💬' }",
+    "    ],",
+    "    emailField?: { enabled, placeholder?, required? },",
+    "    success: { title, body, ctaLabel?, ctaUrl? },",
+    "    hero?: { theme?, eyebrow?, accentColor?, titleFont? }",
+    "  }",
+    "",
+    "Category ids must be snake_case ([a-z][a-z0-9_]*). The public submit endpoint validates posted category against this list — unknown ids return 422.",
+  ].join("\n"),
+  inputSchema: z.object({
+    appIdOrSlug: z.string().min(1),
+    config: z.unknown(),
+  }),
+  handler: (input, cfg) =>
+    apiFetch(
+      cfg,
+      "PUT",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/flows/report`,
+      input.config,
+    ),
+};
+
+export const publishReportFlow: ToolDef<
+  z.ZodObject<{ appIdOrSlug: z.ZodString }>
+> = {
+  name: "publish_report_flow",
+  description:
+    "Promote the draft report config to the live published version. Visitors at appmate.cloud/report/{appSlug} see the new version immediately.",
+  inputSchema: z.object({ appIdOrSlug: z.string().min(1) }),
+  handler: (input, cfg) =>
+    apiFetch(
+      cfg,
+      "POST",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/flows/report/publish`,
+    ),
+};
+
+export const listReportSubmissions: ToolDef<
+  z.ZodObject<{
+    appIdOrSlug: z.ZodString;
+    limit: z.ZodOptional<z.ZodNumber>;
+    cursor: z.ZodOptional<z.ZodString>;
+    category: z.ZodOptional<z.ZodString>;
+  }>
+> = {
+  name: "list_report_submissions",
+  description:
+    "Paginated list of report submissions for an app. Each row: { id, message, category, email, source, createdAt }. Pass `category` to scope to one bucket (e.g. 'bug') for triage.",
+  inputSchema: z.object({
+    appIdOrSlug: z.string().min(1),
+    limit: z.number().int().min(1).max(200).optional(),
+    cursor: z.string().optional(),
+    category: z.string().optional(),
+  }),
+  handler: (input, cfg) => {
+    const qs = new URLSearchParams();
+    if (input.limit !== undefined) qs.set("limit", String(input.limit));
+    if (input.cursor) qs.set("cursor", input.cursor);
+    if (input.category) qs.set("category", input.category);
+    const tail = qs.toString() ? `?${qs.toString()}` : "";
+    return apiFetch(
+      cfg,
+      "GET",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/report/submissions${tail}`,
+    );
+  },
+};
+
 // Registered alphabetically so `list_tools` reads predictably.
 export const ALL_TOOLS = [
   createApp,
   exportWaitlistCsv,
   getApp,
   getCancelFlow,
+  getFeedbackFlow,
+  getReportFlow,
   getWaitlistFlow,
   listApps,
+  listFeedbackSubmissions,
+  listReportSubmissions,
   listWaitlistSignups,
   publishCancelFlow,
+  publishFeedbackFlow,
+  publishReportFlow,
   publishWaitlistFlow,
   updateCancelDraft,
+  updateFeedbackDraft,
+  updateReportDraft,
   updateWaitlistDraft,
 ] as const;

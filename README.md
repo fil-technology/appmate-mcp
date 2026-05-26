@@ -68,6 +68,14 @@ staging or self-hosted instances.
 | `publish_waitlist_flow` | Promote the waitlist draft live. |
 | `list_waitlist_signups` | Paginated list (cursor + nextCursor). |
 | `export_waitlist_csv` | Return the full waitlist as a CSV string. |
+| `get_feedback_flow` | Read published + draft feedback config. |
+| `update_feedback_draft` | Replace the feedback draft. |
+| `publish_feedback_flow` | Promote the feedback draft live. |
+| `list_feedback_submissions` | Paginated list of feedback rows (rating + message + email). |
+| `get_report_flow` | Read published + draft report config. |
+| `update_report_draft` | Replace the report draft (categorised). |
+| `publish_report_flow` | Promote the report draft live. |
+| `list_report_submissions` | Paginated, optional `category` filter. |
 
 Tools that accept an app reference (`get_app`, `update_cancel_draft`,
 etc.) accept either the cuid `id` or the human-readable `slug` — use
