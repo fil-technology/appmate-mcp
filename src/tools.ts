@@ -535,24 +535,141 @@ export const listReportSubmissions: ToolDef<
   },
 };
 
+// ─── Contact flow ───────────────────────────────────────────────────────────
+
+export const getContactFlow: ToolDef<
+  z.ZodObject<{ appIdOrSlug: z.ZodString }>
+> = {
+  name: "get_contact_flow",
+  description:
+    "Read the published and draft contact flow configs for an app. Contact flows host a minimal inquiry form (optional name + required/optional email + optional message text) at appmate.cloud/contact/{appSlug}.",
+  inputSchema: z.object({ appIdOrSlug: z.string().min(1) }),
+  handler: (input, cfg) =>
+    apiFetch(
+      cfg,
+      "GET",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/flows/contact`,
+    ),
+};
+
+export const updateContactDraft: ToolDef<
+  z.ZodObject<{ appIdOrSlug: z.ZodString; config: z.ZodUnknown }>
+> = {
+  name: "update_contact_draft",
+  description: [
+    "Replace the draft contact config. Body MUST be a full contact config object (type: 'contact').",
+    "",
+    "Shape:",
+    "  {",
+    "    type: 'contact',",
+    "    intro: {",
+    "      title, subtitle,",
+    "      submitLabel,",
+    "      legal?                        // optional small print under the form",
+    "    },",
+    "    nameField?: {                   // OPTIONAL name widget",
+    "      enabled: boolean,",
+    "      placeholder?: 'Your name',",
+    "      required?: boolean",
+    "    },",
+    "    emailField?: {                  // OPTIONAL/REQUIRED email input",
+    "      enabled: boolean,",
+    "      placeholder?: 'you@example.com',",
+    "      required?: boolean",
+    "    },",
+    "    messageField?: {                // OPTIONAL message textarea",
+    "      enabled: boolean,",
+    "      placeholder?: 'What is on your mind?',",
+    "      required?: boolean",
+    "    },",
+    "    success: {",
+    "      title, body,",
+    "      ctaLabel?, ctaUrl?            // optional follow-up button pair",
+    "    },",
+    "    hero?: {                        // dynamic landing theme config",
+    "      theme?: 'minimal' | 'gradient' | 'dark' | 'side_by_side',",
+    "      eyebrow?, accentColor?, titleFont?",
+    "    }",
+    "  }",
+  ].join("\n"),
+  inputSchema: z.object({
+    appIdOrSlug: z.string().min(1),
+    config: z.unknown(),
+  }),
+  handler: (input, cfg) =>
+    apiFetch(
+      cfg,
+      "PUT",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/flows/contact`,
+      input.config,
+    ),
+};
+
+export const publishContactFlow: ToolDef<
+  z.ZodObject<{ appIdOrSlug: z.ZodString }>
+> = {
+  name: "publish_contact_flow",
+  description:
+    "Promote the draft contact config to the live published version. Visitors at appmate.cloud/contact/{appSlug} see the new version live immediately.",
+  inputSchema: z.object({ appIdOrSlug: z.string().min(1) }),
+  handler: (input, cfg) =>
+    apiFetch(
+      cfg,
+      "POST",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/flows/contact/publish`,
+    ),
+};
+
+export const listContactSubmissions: ToolDef<
+  z.ZodObject<{
+    appIdOrSlug: z.ZodString;
+    limit: z.ZodOptional<z.ZodNumber>;
+    cursor: z.ZodOptional<z.ZodString>;
+  }>
+> = {
+  name: "list_contact_submissions",
+  description:
+    "Paginated list of contact submissions for an app. Each row: { id, name, email, message, source, country, createdAt }. limit max 200, default 50; pass nextCursor back for next page.",
+  inputSchema: z.object({
+    appIdOrSlug: z.string().min(1),
+    limit: z.number().int().min(1).max(200).optional(),
+    cursor: z.string().optional(),
+  }),
+  handler: (input, cfg) => {
+    const qs = new URLSearchParams();
+    if (input.limit !== undefined) qs.set("limit", String(input.limit));
+    if (input.cursor) qs.set("cursor", input.cursor);
+    const tail = qs.toString() ? `?${qs.toString()}` : "";
+    return apiFetch(
+      cfg,
+      "GET",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/contact/submissions${tail}`,
+    );
+  },
+};
+
 // Registered alphabetically so `list_tools` reads predictably.
 export const ALL_TOOLS = [
   createApp,
   exportWaitlistCsv,
   getApp,
   getCancelFlow,
+  getContactFlow,
   getFeedbackFlow,
   getReportFlow,
   getWaitlistFlow,
   listApps,
+  listContactSubmissions,
   listFeedbackSubmissions,
   listReportSubmissions,
   listWaitlistSignups,
   publishCancelFlow,
+  publishContactFlow,
   publishFeedbackFlow,
   publishReportFlow,
   publishWaitlistFlow,
   updateCancelDraft,
+  updateContactDraft,
   updateFeedbackDraft,
   updateReportDraft,
   updateWaitlistDraft,

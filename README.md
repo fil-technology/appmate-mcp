@@ -76,6 +76,10 @@ staging or self-hosted instances.
 | `update_report_draft` | Replace the report draft (categorised). |
 | `publish_report_flow` | Promote the report draft live. |
 | `list_report_submissions` | Paginated, optional `category` filter. |
+| `get_contact_flow` | Read published + draft contact config. |
+| `update_contact_draft` | Replace the contact draft. |
+| `publish_contact_flow` | Promote the contact draft live. |
+| `list_contact_submissions` | Paginated list of contact rows (name + email + message). |
 
 Tools that accept an app reference (`get_app`, `update_cancel_draft`,
 etc.) accept either the cuid `id` or the human-readable `slug` — use
