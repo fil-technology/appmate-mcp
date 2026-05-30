@@ -17,6 +17,40 @@ export type ToolDef<I extends z.ZodTypeAny> = {
   handler: (input: z.infer<I>, cfg: ApiConfig) => Promise<unknown>;
 };
 
+// `config` for the update_*_draft tools is a full flow-config OBJECT. We
+// must advertise it as `type: object` in the JSON schema (see zodToJsonSchema
+// in index.ts) — otherwise an untyped field leads some MCP hosts to serialize
+// it to a JSON string, which the server then rejects with
+// `422: expected object, received string`.
+//
+// Belt-and-braces: we ALSO accept a JSON string and parse it here (via
+// z.preprocess), since a few hosts stringify nested args regardless. Either
+// way the server receives a real object, never `"{...}"`.
+function parseJsonStringConfig(v: unknown): unknown {
+  if (typeof v === "string") {
+    const trimmed = v.trim();
+    if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+      try {
+        return JSON.parse(trimmed);
+      } catch {
+        // Not valid JSON — leave it; record validation reports a clear error.
+      }
+    }
+  }
+  return v;
+}
+
+// Shared input for every update_*_draft tool: an app reference + the full
+// config object. The inner record makes `config` advertise `type: object`;
+// the preprocess tolerates a stringified body.
+const updateDraftInput = z.object({
+  appIdOrSlug: z.string().min(1),
+  config: z.preprocess(
+    parseJsonStringConfig,
+    z.record(z.string(), z.unknown()),
+  ),
+});
+
 // ─── Apps ───────────────────────────────────────────────────────────────────
 
 export const listApps: ToolDef<z.ZodObject<{}>> = {
@@ -91,12 +125,13 @@ export const getCancelFlow: ToolDef<
     ),
 };
 
-// Config body is `z.unknown()` so we hand the raw JSON to the server,
-// which has the canonical Zod schema. The server returns 422 with paths
-// on validation errors AND a `warnings` array on success for soft
-// mismatches (e.g. showThanksScreen + a "Contact support" label).
+// `config` is the full flow-config object (advertised as type:object via
+// updateDraftInput so hosts pass structured JSON). The server holds the
+// canonical Zod schema: it returns 422 with paths on validation errors AND a
+// `warnings` array on success for soft mismatches (e.g. showThanksScreen + a
+// "Contact support" label).
 export const updateCancelDraft: ToolDef<
-  z.ZodObject<{ appIdOrSlug: z.ZodString; config: z.ZodUnknown }>
+  typeof updateDraftInput
 > = {
   name: "update_cancel_draft",
   description: [
@@ -148,10 +183,7 @@ export const updateCancelDraft: ToolDef<
     "",
     "See https://docs.appmate.cloud/ai-agents for the full do/don't guide and examples.",
   ].join("\n"),
-  inputSchema: z.object({
-    appIdOrSlug: z.string().min(1),
-    config: z.unknown(),
-  }),
+  inputSchema: updateDraftInput,
   handler: (input, cfg) =>
     apiFetch(
       cfg,
@@ -193,7 +225,7 @@ export const getWaitlistFlow: ToolDef<
 };
 
 export const updateWaitlistDraft: ToolDef<
-  z.ZodObject<{ appIdOrSlug: z.ZodString; config: z.ZodUnknown }>
+  typeof updateDraftInput
 > = {
   name: "update_waitlist_draft",
   description: [
@@ -244,10 +276,7 @@ export const updateWaitlistDraft: ToolDef<
     "Server returns { ok:true, warnings: [...] } — check warnings before publishing.",
     "Common warnings: partial_cta (label without url, or vice versa).",
   ].join("\n"),
-  inputSchema: z.object({
-    appIdOrSlug: z.string().min(1),
-    config: z.unknown(),
-  }),
+  inputSchema: updateDraftInput,
   handler: (input, cfg) =>
     apiFetch(
       cfg,
@@ -336,7 +365,7 @@ export const getFeedbackFlow: ToolDef<
 };
 
 export const updateFeedbackDraft: ToolDef<
-  z.ZodObject<{ appIdOrSlug: z.ZodString; config: z.ZodUnknown }>
+  typeof updateDraftInput
 > = {
   name: "update_feedback_draft",
   description: [
@@ -373,10 +402,7 @@ export const updateFeedbackDraft: ToolDef<
     "",
     "Server returns { ok:true, warnings: [] }. Warning rules will be added later — for now treat any non-empty array as advisory.",
   ].join("\n"),
-  inputSchema: z.object({
-    appIdOrSlug: z.string().min(1),
-    config: z.unknown(),
-  }),
+  inputSchema: updateDraftInput,
   handler: (input, cfg) =>
     apiFetch(
       cfg,
@@ -447,7 +473,7 @@ export const getReportFlow: ToolDef<
 };
 
 export const updateReportDraft: ToolDef<
-  z.ZodObject<{ appIdOrSlug: z.ZodString; config: z.ZodUnknown }>
+  typeof updateDraftInput
 > = {
   name: "update_report_draft",
   description: [
@@ -476,10 +502,7 @@ export const updateReportDraft: ToolDef<
     "",
     "Category ids must be snake_case ([a-z][a-z0-9_]*). The public submit endpoint validates posted category against this list — unknown ids return 422.",
   ].join("\n"),
-  inputSchema: z.object({
-    appIdOrSlug: z.string().min(1),
-    config: z.unknown(),
-  }),
+  inputSchema: updateDraftInput,
   handler: (input, cfg) =>
     apiFetch(
       cfg,
@@ -553,7 +576,7 @@ export const getContactFlow: ToolDef<
 };
 
 export const updateContactDraft: ToolDef<
-  z.ZodObject<{ appIdOrSlug: z.ZodString; config: z.ZodUnknown }>
+  typeof updateDraftInput
 > = {
   name: "update_contact_draft",
   description: [
@@ -592,10 +615,7 @@ export const updateContactDraft: ToolDef<
     "    }",
     "  }",
   ].join("\n"),
-  inputSchema: z.object({
-    appIdOrSlug: z.string().min(1),
-    config: z.unknown(),
-  }),
+  inputSchema: updateDraftInput,
   handler: (input, cfg) =>
     apiFetch(
       cfg,
@@ -648,29 +668,284 @@ export const listContactSubmissions: ToolDef<
   },
 };
 
+// ─── Onboarding flow (web-to-app funnel) ─────────────────────────────────────
+
+export const getOnboardingFlow: ToolDef<
+  z.ZodObject<{ appIdOrSlug: z.ZodString }>
+> = {
+  name: "get_onboarding_flow",
+  description:
+    "Read the published and draft onboarding flow configs for an app. Onboarding flows are web-to-app funnels (intro → quiz/info/email-capture steps → App Store handoff) hosted at appmate.cloud/onboarding/{appSlug}. Answers + email are captured server-side; the iOS SDK recovers them on first launch via a claim token.",
+  inputSchema: z.object({ appIdOrSlug: z.string().min(1) }),
+  handler: (input, cfg) =>
+    apiFetch(
+      cfg,
+      "GET",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/flows/onboarding`,
+    ),
+};
+
+export const updateOnboardingDraft: ToolDef<
+  typeof updateDraftInput
+> = {
+  name: "update_onboarding_draft",
+  description: [
+    "Replace the draft onboarding config. Body MUST be a full onboarding config object (type: 'onboarding').",
+    "",
+    "Shape:",
+    "  {",
+    "    type: 'onboarding',",
+    "    intro: { title, subtitle, startLabel, eyebrow? },",
+    "    steps: [                          // REQUIRED 1–20, ordered",
+    "      // question step — pick one or several options",
+    "      {",
+    "        kind: 'question', id: 'goal',",
+    "        prompt: 'What brings you here?', subtitle?: '…',",
+    "        selectMode?: 'single' | 'multi',   // omit → single",
+    "        autoAdvance?: true,                // single only: tap advances",
+    "        required?: true,",
+    "        options: [ { id: 'save_time', label: 'Save time', emoji?: '⚡' } ]",
+    "      },",
+    "      // info step — copy/image screen, no input",
+    "      { kind: 'info', id: 'value', title: '…', body: '…', imageUrl?, continueLabel? },",
+    "      // email_capture step — the lead-capture moment",
+    "      {",
+    "        kind: 'email_capture', id: 'email',",
+    "        title: '…', subtitle?, placeholder?, submitLabel?,",
+    "        required?: true,                 // omit → required",
+    "        legal?: '…'",
+    "      }",
+    "    ],",
+    "    handoff: {",
+    "      title, body, ctaLabel,",
+    "      appStoreUrl?,                     // App Store / TestFlight URL; omit → no button",
+    "      legal?",
+    "    },",
+    "    hero?: { theme?, eyebrow?, accentColor?, titleFont? }",
+    "  }",
+    "",
+    "Step + option ids must be snake_case ([a-z][a-z0-9_]*) and unique. The server returns { ok:true, warnings:[...] } — warnings flag a missing email_capture step, a handoff with no appStoreUrl, duplicate ids, etc. Treat warnings as advisory.",
+  ].join("\n"),
+  inputSchema: updateDraftInput,
+  handler: (input, cfg) =>
+    apiFetch(
+      cfg,
+      "PUT",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/flows/onboarding`,
+      input.config,
+    ),
+};
+
+export const publishOnboardingFlow: ToolDef<
+  z.ZodObject<{ appIdOrSlug: z.ZodString }>
+> = {
+  name: "publish_onboarding_flow",
+  description:
+    "Promote the draft onboarding config to the live published version. Visitors at appmate.cloud/onboarding/{appSlug} see the new funnel immediately.",
+  inputSchema: z.object({ appIdOrSlug: z.string().min(1) }),
+  handler: (input, cfg) =>
+    apiFetch(
+      cfg,
+      "POST",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/flows/onboarding/publish`,
+    ),
+};
+
+export const listOnboardingSubmissions: ToolDef<
+  z.ZodObject<{
+    appIdOrSlug: z.ZodString;
+    limit: z.ZodOptional<z.ZodNumber>;
+    cursor: z.ZodOptional<z.ZodString>;
+  }>
+> = {
+  name: "list_onboarding_submissions",
+  description:
+    "Paginated list of completed onboarding funnels for an app. Each row: { id, answers, email, source, claimed, claimedAt, country, createdAt }. `claimed` is true once the install was matched back to the completion. limit max 200, default 50; pass nextCursor back for the next page.",
+  inputSchema: z.object({
+    appIdOrSlug: z.string().min(1),
+    limit: z.number().int().min(1).max(200).optional(),
+    cursor: z.string().optional(),
+  }),
+  handler: (input, cfg) => {
+    const qs = new URLSearchParams();
+    if (input.limit !== undefined) qs.set("limit", String(input.limit));
+    if (input.cursor) qs.set("cursor", input.cursor);
+    const tail = qs.toString() ? `?${qs.toString()}` : "";
+    return apiFetch(
+      cfg,
+      "GET",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/onboarding/submissions${tail}`,
+    );
+  },
+};
+
+export const exportOnboardingCsv: ToolDef<
+  z.ZodObject<{ appIdOrSlug: z.ZodString }>
+> = {
+  name: "export_onboarding_csv",
+  description:
+    "Return all completed onboarding funnels for an app as a CSV string (header row + one row per completion, with email + answers JSON + claim status). Useful for hand-off to a spreadsheet or mail merge.",
+  inputSchema: z.object({ appIdOrSlug: z.string().min(1) }),
+  handler: async (input, cfg) => {
+    const csv = await apiFetchText(
+      cfg,
+      "GET",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/onboarding/submissions.csv`,
+    );
+    return { csv };
+  },
+};
+
+// ─── Referral flow ───────────────────────────────────────────────────────────
+
+export const getReferralFlow: ToolDef<
+  z.ZodObject<{ appIdOrSlug: z.ZodString }>
+> = {
+  name: "get_referral_flow",
+  description:
+    "Read the published and draft referral program config for an app. Referral is a share-with-a-friend loop: each user gets a link (appmate.cloud/r/{code}); a friend who installs triggers a reward for both sides. Codes + the referral graph live server-side; the iOS SDK mints links, attributes installs on first launch, and reports rewards owed.",
+  inputSchema: z.object({ appIdOrSlug: z.string().min(1) }),
+  handler: (input, cfg) =>
+    apiFetch(
+      cfg,
+      "GET",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/flows/referral`,
+    ),
+};
+
+export const updateReferralDraft: ToolDef<
+  typeof updateDraftInput
+> = {
+  name: "update_referral_draft",
+  description: [
+    "Replace the draft referral config. Body MUST be a full referral config object (type: 'referral').",
+    "",
+    "Shape:",
+    "  {",
+    "    type: 'referral',",
+    "    landing: {                        // the invite page a friend sees at /r/{code}",
+    "      eyebrow?, title, subtitle, ctaLabel,",
+    "      appStoreUrl?,                    // REQUIRED before go-live — the install button target",
+    "      legal?",
+    "    },",
+    "    share: { messageTemplate },        // the referrer's share text; the link is appended automatically",
+    "    rewards: {",
+    "      referrerWeeks: 1,                // free weeks the referrer earns per installed friend (1–8)",
+    "      refereeEnabled: true,            // also reward the NEW user on install?",
+    "      refereeWeeks?: 1,                // required when refereeEnabled (1–8)",
+    "      referrerLabel?, refereeLabel?    // human copy shown on the landing + returned to the SDK",
+    "    },",
+    "    maxRewardsPerReferrer?: 10         // lifetime cap per referrer; 0/omit = unlimited (farming risk)",
+    "  }",
+    "",
+    "Reward trigger is the friend's INSTALL (attributed on first launch). The server returns { ok:true, warnings:[...] } — warnings flag a missing/placeholder appStoreUrl, refereeEnabled without refereeWeeks, and an absent cap. Treat warnings as advisory but fix them before publishing.",
+  ].join("\n"),
+  inputSchema: updateDraftInput,
+  handler: (input, cfg) =>
+    apiFetch(
+      cfg,
+      "PUT",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/flows/referral`,
+      input.config,
+    ),
+};
+
+export const publishReferralFlow: ToolDef<
+  z.ZodObject<{ appIdOrSlug: z.ZodString }>
+> = {
+  name: "publish_referral_flow",
+  description:
+    "Promote the draft referral config to the live published version. New share links + the invite landing use the new config immediately.",
+  inputSchema: z.object({ appIdOrSlug: z.string().min(1) }),
+  handler: (input, cfg) =>
+    apiFetch(
+      cfg,
+      "POST",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/flows/referral/publish`,
+    ),
+};
+
+export const listReferrals: ToolDef<
+  z.ZodObject<{
+    appIdOrSlug: z.ZodString;
+    status: z.ZodOptional<z.ZodEnum<["pending", "attributed", "expired"]>>;
+    limit: z.ZodOptional<z.ZodNumber>;
+    cursor: z.ZodOptional<z.ZodString>;
+  }>
+> = {
+  name: "list_referrals",
+  description:
+    "Paginated list of referrals for an app. Each row: { id, code, referrerUserId, status, refereeUserId, attributedAt, referrerRewarded, refereeRewarded, country, createdAt }. status='attributed' means the friend installed. Optional `status` filter; limit max 200, default 50.",
+  inputSchema: z.object({
+    appIdOrSlug: z.string().min(1),
+    status: z.enum(["pending", "attributed", "expired"]).optional(),
+    limit: z.number().int().min(1).max(200).optional(),
+    cursor: z.string().optional(),
+  }),
+  handler: (input, cfg) => {
+    const qs = new URLSearchParams();
+    if (input.status) qs.set("status", input.status);
+    if (input.limit !== undefined) qs.set("limit", String(input.limit));
+    if (input.cursor) qs.set("cursor", input.cursor);
+    const tail = qs.toString() ? `?${qs.toString()}` : "";
+    return apiFetch(
+      cfg,
+      "GET",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/referrals${tail}`,
+    );
+  },
+};
+
+export const exportReferralsCsv: ToolDef<
+  z.ZodObject<{ appIdOrSlug: z.ZodString }>
+> = {
+  name: "export_referrals_csv",
+  description:
+    "Return the full referral graph for an app as a CSV string (one row per invite, with code, status, referee, and reward flags).",
+  inputSchema: z.object({ appIdOrSlug: z.string().min(1) }),
+  handler: async (input, cfg) => {
+    const csv = await apiFetchText(
+      cfg,
+      "GET",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/referrals.csv`,
+    );
+    return { csv };
+  },
+};
+
 // Registered alphabetically so `list_tools` reads predictably.
 export const ALL_TOOLS = [
   createApp,
+  exportOnboardingCsv,
+  exportReferralsCsv,
   exportWaitlistCsv,
   getApp,
   getCancelFlow,
   getContactFlow,
   getFeedbackFlow,
+  getOnboardingFlow,
+  getReferralFlow,
   getReportFlow,
   getWaitlistFlow,
   listApps,
   listContactSubmissions,
   listFeedbackSubmissions,
+  listOnboardingSubmissions,
+  listReferrals,
   listReportSubmissions,
   listWaitlistSignups,
   publishCancelFlow,
   publishContactFlow,
   publishFeedbackFlow,
+  publishOnboardingFlow,
+  publishReferralFlow,
   publishReportFlow,
   publishWaitlistFlow,
   updateCancelDraft,
   updateContactDraft,
   updateFeedbackDraft,
+  updateOnboardingDraft,
+  updateReferralDraft,
   updateReportDraft,
   updateWaitlistDraft,
 ] as const;

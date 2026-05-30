@@ -80,6 +80,16 @@ staging or self-hosted instances.
 | `update_contact_draft` | Replace the contact draft. |
 | `publish_contact_flow` | Promote the contact draft live. |
 | `list_contact_submissions` | Paginated list of contact rows (name + email + message). |
+| `get_onboarding_flow` | Read published + draft onboarding (web-to-app funnel) config. |
+| `update_onboarding_draft` | Replace the onboarding draft (quiz / info / email-capture steps + handoff). |
+| `publish_onboarding_flow` | Promote the onboarding draft live. |
+| `list_onboarding_submissions` | Paginated list of funnel completions (answers + email + claim status). |
+| `export_onboarding_csv` | Return all onboarding completions as a CSV string. |
+| `get_referral_flow` | Read published + draft referral program config. |
+| `update_referral_draft` | Replace the referral draft (rewards, share text, cap, landing). |
+| `publish_referral_flow` | Promote the referral draft live. |
+| `list_referrals` | Paginated referral graph (status, referee, reward flags). |
+| `export_referrals_csv` | Return the full referral graph as a CSV string. |
 
 Tools that accept an app reference (`get_app`, `update_cancel_draft`,
 etc.) accept either the cuid `id` or the human-readable `slug` — use
@@ -94,6 +104,10 @@ whichever you have. The full REST shape is documented at
 
 > *"Export the waitlist for `appmate-pro` as CSV and save it to
 > `~/Downloads/waitlist.csv`."*
+
+> *"Build a 3-question onboarding funnel for `ledgr` that asks the user's
+> goal, captures their email, and hands off to the App Store, then publish
+> it."*
 
 > *"Compare the published and draft cancel configs for `quakemate` and
 > tell me what changed."*

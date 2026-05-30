@@ -150,6 +150,18 @@ function zodToJsonSchema(schema: z.ZodTypeAny): JsonSchema {
   if (schema instanceof z.ZodBoolean) {
     return { type: "boolean" };
   }
+  // z.preprocess / z.transform wrap the real schema in ZodEffects — emit the
+  // inner schema's shape so e.g. a preprocessed record still advertises
+  // `type: object` to the host.
+  if (schema instanceof z.ZodEffects) {
+    return zodToJsonSchema(schema._def.schema);
+  }
+  // A record (open-ended object, e.g. a flow `config`) MUST advertise
+  // `type: object` — otherwise hosts may serialize the value to a JSON string
+  // and the server rejects it ("expected object, received string").
+  if (schema instanceof z.ZodRecord) {
+    return { type: "object", additionalProperties: true };
+  }
   if (schema instanceof z.ZodUnknown || schema instanceof z.ZodAny) {
     return {};
   }
