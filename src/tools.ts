@@ -803,7 +803,7 @@ export const getReferralFlow: ToolDef<
 > = {
   name: "get_referral_flow",
   description:
-    "Read the published and draft referral program config for an app. Referral is a share-with-a-friend loop: each user gets a link (appmate.cloud/r/{code}); a friend who installs triggers a reward for both sides. Codes + the referral graph live server-side; the iOS SDK mints links, attributes installs on first launch, and reports rewards owed.",
+    "Read the published and draft referral program config for an app. Referral is a share-with-a-friend loop: each user gets a link (appmate.cloud/r/{code}) AND a short human-readable code (e.g. K7Q4-R9XP); a friend who taps the link or types the code, then installs, triggers a reward for both sides. Codes + the referral graph live server-side; the iOS SDK mints links/codes, attributes installs on first launch (clipboard handoff) or via a typed code, and reports rewards owed.",
   inputSchema: z.object({ appIdOrSlug: z.string().min(1) }),
   handler: (input, cfg) =>
     apiFetch(
@@ -875,7 +875,7 @@ export const listReferrals: ToolDef<
 > = {
   name: "list_referrals",
   description:
-    "Paginated list of referrals for an app. Each row: { id, code, referrerUserId, status, refereeUserId, attributedAt, referrerRewarded, refereeRewarded, country, createdAt }. status='attributed' means the friend installed. Optional `status` filter; limit max 200, default 50.",
+    "Paginated list of referrals for an app. Each row: { id, code, referrerUserId, status, source, refereeUserId, attributedAt, referrerRewarded, refereeRewarded, country, createdAt }. status='attributed' means the friend installed; source is 'link' (tapped share link) or 'code' (typed the referrer's code). Optional `status` filter; limit max 200, default 50.",
   inputSchema: z.object({
     appIdOrSlug: z.string().min(1),
     status: z.enum(["pending", "attributed", "expired"]).optional(),
@@ -901,7 +901,7 @@ export const exportReferralsCsv: ToolDef<
 > = {
   name: "export_referrals_csv",
   description:
-    "Return the full referral graph for an app as a CSV string (one row per invite, with code, status, referee, and reward flags).",
+    "Return the full referral graph for an app as a CSV string (one row per invite, with code, status, source (link/typed-code), referee, and reward flags).",
   inputSchema: z.object({ appIdOrSlug: z.string().min(1) }),
   handler: async (input, cfg) => {
     const csv = await apiFetchText(
