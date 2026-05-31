@@ -88,8 +88,12 @@ staging or self-hosted instances.
 | `get_referral_flow` | Read published + draft referral program config. |
 | `update_referral_draft` | Replace the referral draft (rewards, share text, cap, landing). |
 | `publish_referral_flow` | Promote the referral draft live. |
-| `list_referrals` | Paginated referral graph (status, referee, reward flags). |
+| `list_referrals` | Paginated referral graph (status, `source` [link or typed-code], referee, reward flags). |
 | `export_referrals_csv` | Return the full referral graph as a CSV string. |
+
+Each referrer gets a unique link **and** a short, human-readable code (e.g.
+`K7Q4-R9XP`); a friend redeems by tapping the link or **typing the code** (no
+clipboard needed). `source` on each referral row records which path was used.
 
 Tools that accept an app reference (`get_app`, `update_cancel_draft`,
 etc.) accept either the cuid `id` or the human-readable `slug` — use
