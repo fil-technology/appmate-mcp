@@ -829,6 +829,7 @@ export const updateReferralDraft: ToolDef<
     "    landing: {                        // the invite page a friend sees at /r/{code}",
     "      eyebrow?, title, subtitle, ctaLabel,",
     "      appStoreUrl?,                    // REQUIRED before go-live — the install button target",
+    "      fallback?: 'app_store' | 'website',  // where a not-installed friend goes (default app_store; 'website' uses the app's websiteUrl)",
     "      legal?",
     "    },",
     "    share: { messageTemplate },        // the referrer's share text; the link is appended automatically",
