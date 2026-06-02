@@ -670,7 +670,7 @@ export const updateLinkPageDraft: ToolDef<typeof updateDraftInput> = {
     "    type: 'link_page',",
     "    header: { title, description? },     // logo comes from the app record",
     "    iconLinks: [                         // top row of compact icon buttons (<=6)",
-    "      { icon: '🌐', label: 'Website', url: 'https://…' }   // icon = an emoji",
+    "      { icon: 'ri:instagram', label: 'Instagram', url: 'https://…' }   // icon = a brand 'ri:<key>' (instagram/tiktok/x/youtube/…), a lucide name (e.g. 'Globe'), or an emoji",
     "    ],",
     "    links: [                            // main list of labeled links (<=25)",
     "      { label: 'Download on the App Store', sublabel?: 'iPhone & iPad', url: 'https://…' }",
