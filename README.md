@@ -90,6 +90,9 @@ staging or self-hosted instances.
 | `publish_referral_flow` | Promote the referral draft live. |
 | `list_referrals` | Paginated referral graph (status, `source` [link or typed-code], referee, reward flags). |
 | `export_referrals_csv` | Return the full referral graph as a CSV string. |
+| `get_link_page_flow` | Read published + draft link-page (link-in-bio) config. |
+| `update_link_page_draft` | Replace the link-page draft (header, icon links, link list, theme). |
+| `publish_link_page_flow` | Promote the link-page draft live (appmate.cloud/p/{appSlug}). |
 
 Each referrer gets a unique link **and** a short, human-readable code (e.g.
 `K7Q4-R9XP`); a friend redeems by tapping the link or **typing the code** (no

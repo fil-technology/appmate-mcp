@@ -643,6 +643,72 @@ export const publishContactFlow: ToolDef<
     ),
 };
 
+// ─── Link page (link-in-bio) ────────────────────────────────────────────────
+
+export const getLinkPageFlow: ToolDef<
+  z.ZodObject<{ appIdOrSlug: z.ZodString }>
+> = {
+  name: "get_link_page_flow",
+  description:
+    "Read the published and draft link-page configs for an app. A link page is a shareable 'link-in-bio' page (app logo + title/description, a row of icon links, and a list of labeled links) at appmate.cloud/p/{appSlug} — drop it in an Instagram/TikTok bio.",
+  inputSchema: z.object({ appIdOrSlug: z.string().min(1) }),
+  handler: (input, cfg) =>
+    apiFetch(
+      cfg,
+      "GET",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/flows/link-page`,
+    ),
+};
+
+export const updateLinkPageDraft: ToolDef<typeof updateDraftInput> = {
+  name: "update_link_page_draft",
+  description: [
+    "Replace the draft link-page config. Body MUST be a full link_page config object (type: 'link_page').",
+    "",
+    "Shape:",
+    "  {",
+    "    type: 'link_page',",
+    "    header: { title, description? },     // logo comes from the app record",
+    "    iconLinks: [                         // top row of compact icon buttons (<=6)",
+    "      { icon: '🌐', label: 'Website', url: 'https://…' }   // icon = an emoji",
+    "    ],",
+    "    links: [                            // main list of labeled links (<=25)",
+    "      { label: 'Download on the App Store', sublabel?: 'iPhone & iPad', url: 'https://…' }",
+    "    ],",
+    "    legal?: string,                     // small print at the bottom",
+    "    hero?: {                            // visual treatment",
+    "      theme?: 'minimal' | 'gradient' | 'dark' | 'side_by_side',",
+    "      eyebrow?, accentColor?, titleFont?",
+    "    }",
+    "  }",
+    "",
+    "No submissions — a link page is a published, versioned page. Publish with publish_link_page_flow.",
+  ].join("\n"),
+  inputSchema: updateDraftInput,
+  handler: (input, cfg) =>
+    apiFetch(
+      cfg,
+      "PUT",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/flows/link-page`,
+      input.config,
+    ),
+};
+
+export const publishLinkPageFlow: ToolDef<
+  z.ZodObject<{ appIdOrSlug: z.ZodString }>
+> = {
+  name: "publish_link_page_flow",
+  description:
+    "Promote the draft link-page config to the live published version. Visitors at appmate.cloud/p/{appSlug} see the new version immediately.",
+  inputSchema: z.object({ appIdOrSlug: z.string().min(1) }),
+  handler: (input, cfg) =>
+    apiFetch(
+      cfg,
+      "POST",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/flows/link-page/publish`,
+    ),
+};
+
 export const listContactSubmissions: ToolDef<
   z.ZodObject<{
     appIdOrSlug: z.ZodString;
@@ -927,6 +993,7 @@ export const ALL_TOOLS = [
   getCancelFlow,
   getContactFlow,
   getFeedbackFlow,
+  getLinkPageFlow,
   getOnboardingFlow,
   getReferralFlow,
   getReportFlow,
@@ -941,6 +1008,7 @@ export const ALL_TOOLS = [
   publishCancelFlow,
   publishContactFlow,
   publishFeedbackFlow,
+  publishLinkPageFlow,
   publishOnboardingFlow,
   publishReferralFlow,
   publishReportFlow,
@@ -948,6 +1016,7 @@ export const ALL_TOOLS = [
   updateCancelDraft,
   updateContactDraft,
   updateFeedbackDraft,
+  updateLinkPageDraft,
   updateOnboardingDraft,
   updateReferralDraft,
   updateReportDraft,
