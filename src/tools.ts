@@ -253,7 +253,7 @@ export const updateWaitlistDraft: ToolDef<
     "      theme?: 'minimal' | 'gradient' | 'dark' | 'side_by_side',",
     "      eyebrow?: string,   // short chip above title, e.g. 'Coming soon · Q1 2026'",
     "      accentColor?: string, // hex '#rrggbb'; tints button + chip + gradient blob",
-    "      bullets?: [           // 0–5 value-prop cards under the form",
+    "      bullets?: [           // 0–5 value-prop cards, stacked one per row under the form",
     "        { icon?: '✨', title: 'Fast', body?: 'Sub-second responses' }",
     "      ],",
     "      showCount?: boolean,  // renders '{N} on the waitlist' pill (hides if <3 signups)",
