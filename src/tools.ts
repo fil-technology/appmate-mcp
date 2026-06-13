@@ -983,12 +983,261 @@ export const exportReferralsCsv: ToolDef<
   },
 };
 
+// ─── Wishlist flow (feature-request board) ──────────────────────────────────
+//
+// Unlike every other flow (write-only), the wishlist is an INTERACTIVE board:
+// ideas are read back, upvoted, commented on, and moderated. Beyond the usual
+// get/update/publish trio it exposes moderation tools (set status, delete idea,
+// reply, delete comment) — the first MUTATING admin tools in the set.
+
+export const getWishlistFlow: ToolDef<
+  z.ZodObject<{ appIdOrSlug: z.ZodString }>
+> = {
+  name: "get_wishlist_flow",
+  description:
+    "Read the published and draft wishlist (feature-request board) configs for an app. The board lives at appmate.cloud/wishlist/{appSlug}; visitors submit ideas, upvote, and comment, and the owner moderates status.",
+  inputSchema: z.object({ appIdOrSlug: z.string().min(1) }),
+  handler: (input, cfg) =>
+    apiFetch(
+      cfg,
+      "GET",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/flows/wishlist`,
+    ),
+};
+
+export const updateWishlistDraft: ToolDef<typeof updateDraftInput> = {
+  name: "update_wishlist_draft",
+  description: [
+    "Replace the draft wishlist config. Body MUST be a full wishlist config object (type: 'wishlist').",
+    "",
+    "Shape:",
+    "  {",
+    "    type: 'wishlist',",
+    "    intro: { title, subtitle, submitLabel, legal? },",
+    "    identity?: {                     // who can participate + vote dedup",
+    "      mode: 'anonymous' | 'email',   // default 'anonymous' (dedup by cookie+IP)",
+    "      requireEmailToSubmit?, requireEmailToVote?, requireEmailToComment?  // email mode only",
+    "    },",
+    "    categories?: [                   // OPTIONAL tags (0–12)",
+    "      { id: 'feature', label: 'New feature', emoji?: '✨', hint?: '…' }",
+    "    ],",
+    "    statusLabels?: {                 // rename lifecycle stages on the board",
+    "      open?, planned?, in_progress?, done?, declined?",
+    "    },",
+    "    submitForm?: { titlePlaceholder?, bodyPlaceholder? },",
+    "    moderation?: { autoApprove?: false },  // false (default) = new ideas start pending/hidden",
+    "    success: { title, body, ctaLabel?, ctaUrl? },",
+    "    hero?: { theme?, eyebrow?, accentColor?, titleFont? }",
+    "  }",
+    "",
+    "Server returns { ok:true, warnings: [] }.",
+  ].join("\n"),
+  inputSchema: updateDraftInput,
+  handler: (input, cfg) =>
+    apiFetch(
+      cfg,
+      "PUT",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/flows/wishlist`,
+      input.config,
+    ),
+};
+
+export const publishWishlistFlow: ToolDef<
+  z.ZodObject<{ appIdOrSlug: z.ZodString }>
+> = {
+  name: "publish_wishlist_flow",
+  description:
+    "Promote the draft wishlist config to the live published version. Visitors at appmate.cloud/wishlist/{appSlug} see the new version immediately.",
+  inputSchema: z.object({ appIdOrSlug: z.string().min(1) }),
+  handler: (input, cfg) =>
+    apiFetch(
+      cfg,
+      "POST",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/flows/wishlist/publish`,
+    ),
+};
+
+export const listWishlistIdeas: ToolDef<
+  z.ZodObject<{
+    appIdOrSlug: z.ZodString;
+    status: z.ZodOptional<z.ZodString>;
+    category: z.ZodOptional<z.ZodString>;
+    sort: z.ZodOptional<z.ZodEnum<["votes", "new"]>>;
+    limit: z.ZodOptional<z.ZodNumber>;
+    cursor: z.ZodOptional<z.ZodString>;
+  }>
+> = {
+  name: "list_wishlist_ideas",
+  description:
+    "Paginated list of wishlist ideas for an app — ALL statuses (including pending review). Each row: { id, title, body, category, status, voteCount, commentCount, pinned, author, email, source, country, createdAt }. Optional status ('pending'|'open'|'planned'|'in_progress'|'done'|'declined') + category filters; sort 'votes' (default 'new'). limit max 200, default 50; pass nextCursor back for the next page.",
+  inputSchema: z.object({
+    appIdOrSlug: z.string().min(1),
+    status: z.string().optional(),
+    category: z.string().optional(),
+    sort: z.enum(["votes", "new"]).optional(),
+    limit: z.number().int().min(1).max(200).optional(),
+    cursor: z.string().optional(),
+  }),
+  handler: (input, cfg) => {
+    const qs = new URLSearchParams();
+    if (input.status) qs.set("status", input.status);
+    if (input.category) qs.set("category", input.category);
+    if (input.sort) qs.set("sort", input.sort);
+    if (input.limit !== undefined) qs.set("limit", String(input.limit));
+    if (input.cursor) qs.set("cursor", input.cursor);
+    const tail = qs.toString() ? `?${qs.toString()}` : "";
+    return apiFetch(
+      cfg,
+      "GET",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/wishlist/ideas${tail}`,
+    );
+  },
+};
+
+export const setWishlistIdeaStatus: ToolDef<
+  z.ZodObject<{
+    appIdOrSlug: z.ZodString;
+    ideaId: z.ZodString;
+    status: z.ZodEnum<["pending", "open", "planned", "in_progress", "done", "declined"]>;
+    pinned: z.ZodOptional<z.ZodBoolean>;
+  }>
+> = {
+  name: "set_wishlist_idea_status",
+  description:
+    "Moderate an idea: set its status and/or pin it. 'pending' hides it from the public board; 'open' approves it. Statuses: pending | open | planned | in_progress | done | declined.",
+  inputSchema: z.object({
+    appIdOrSlug: z.string().min(1),
+    ideaId: z.string().min(1),
+    status: z.enum(["pending", "open", "planned", "in_progress", "done", "declined"]),
+    pinned: z.boolean().optional(),
+  }),
+  handler: (input, cfg) =>
+    apiFetch(
+      cfg,
+      "PATCH",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/wishlist/ideas/${encodeURIComponent(input.ideaId)}`,
+      { status: input.status, ...(input.pinned !== undefined ? { pinned: input.pinned } : {}) },
+    ),
+};
+
+export const deleteWishlistIdea: ToolDef<
+  z.ZodObject<{ appIdOrSlug: z.ZodString; ideaId: z.ZodString }>
+> = {
+  name: "delete_wishlist_idea",
+  description:
+    "Permanently delete an idea AND all of its votes and comments. IRREVERSIBLE — there is no undo. Prefer set_wishlist_idea_status with 'declined' to reject an idea while keeping it (and the decision) visible.",
+  inputSchema: z.object({
+    appIdOrSlug: z.string().min(1),
+    ideaId: z.string().min(1),
+  }),
+  handler: (input, cfg) =>
+    apiFetch(
+      cfg,
+      "DELETE",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/wishlist/ideas/${encodeURIComponent(input.ideaId)}`,
+    ),
+};
+
+export const listWishlistComments: ToolDef<
+  z.ZodObject<{
+    appIdOrSlug: z.ZodString;
+    ideaId: z.ZodString;
+    limit: z.ZodOptional<z.ZodNumber>;
+    cursor: z.ZodOptional<z.ZodString>;
+  }>
+> = {
+  name: "list_wishlist_comments",
+  description:
+    "Paginated comments on an idea (oldest-first, excludes deleted). Each row: { id, body, author, isOwner, isOfficial, createdAt }. limit max 200, default 50; pass nextCursor back for more.",
+  inputSchema: z.object({
+    appIdOrSlug: z.string().min(1),
+    ideaId: z.string().min(1),
+    limit: z.number().int().min(1).max(200).optional(),
+    cursor: z.string().optional(),
+  }),
+  handler: (input, cfg) => {
+    const qs = new URLSearchParams();
+    if (input.limit !== undefined) qs.set("limit", String(input.limit));
+    if (input.cursor) qs.set("cursor", input.cursor);
+    const tail = qs.toString() ? `?${qs.toString()}` : "";
+    return apiFetch(
+      cfg,
+      "GET",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/wishlist/ideas/${encodeURIComponent(input.ideaId)}/comments${tail}`,
+    );
+  },
+};
+
+export const postWishlistComment: ToolDef<
+  z.ZodObject<{
+    appIdOrSlug: z.ZodString;
+    ideaId: z.ZodString;
+    body: z.ZodString;
+    official: z.ZodOptional<z.ZodBoolean>;
+  }>
+> = {
+  name: "post_wishlist_comment",
+  description:
+    "Post an OWNER reply on an idea (shown with a Team badge). Set official:true to mark it an authoritative response. Use this to answer or expand on a user's idea.",
+  inputSchema: z.object({
+    appIdOrSlug: z.string().min(1),
+    ideaId: z.string().min(1),
+    body: z.string().min(1).max(2000),
+    official: z.boolean().optional(),
+  }),
+  handler: (input, cfg) =>
+    apiFetch(
+      cfg,
+      "POST",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/wishlist/ideas/${encodeURIComponent(input.ideaId)}/comments`,
+      { body: input.body, official: input.official ?? false },
+    ),
+};
+
+export const deleteWishlistComment: ToolDef<
+  z.ZodObject<{ appIdOrSlug: z.ZodString; commentId: z.ZodString }>
+> = {
+  name: "delete_wishlist_comment",
+  description:
+    "Soft-delete a comment (hidden from the public board, thread continuity preserved). Use for moderation.",
+  inputSchema: z.object({
+    appIdOrSlug: z.string().min(1),
+    commentId: z.string().min(1),
+  }),
+  handler: (input, cfg) =>
+    apiFetch(
+      cfg,
+      "DELETE",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/wishlist/comments/${encodeURIComponent(input.commentId)}`,
+    ),
+};
+
+export const exportWishlistCsv: ToolDef<
+  z.ZodObject<{ appIdOrSlug: z.ZodString }>
+> = {
+  name: "export_wishlist_csv",
+  description:
+    "Return all wishlist ideas for an app as a CSV string (one row per idea, every status: created_at, status, title, votes, comments, category, email, author, country, body).",
+  inputSchema: z.object({ appIdOrSlug: z.string().min(1) }),
+  handler: async (input, cfg) => {
+    const csv = await apiFetchText(
+      cfg,
+      "GET",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/wishlist/ideas.csv`,
+    );
+    return { csv };
+  },
+};
+
 // Registered alphabetically so `list_tools` reads predictably.
 export const ALL_TOOLS = [
   createApp,
+  deleteWishlistComment,
+  deleteWishlistIdea,
   exportOnboardingCsv,
   exportReferralsCsv,
   exportWaitlistCsv,
+  exportWishlistCsv,
   getApp,
   getCancelFlow,
   getContactFlow,
@@ -998,6 +1247,7 @@ export const ALL_TOOLS = [
   getReferralFlow,
   getReportFlow,
   getWaitlistFlow,
+  getWishlistFlow,
   listApps,
   listContactSubmissions,
   listFeedbackSubmissions,
@@ -1005,6 +1255,9 @@ export const ALL_TOOLS = [
   listReferrals,
   listReportSubmissions,
   listWaitlistSignups,
+  listWishlistComments,
+  listWishlistIdeas,
+  postWishlistComment,
   publishCancelFlow,
   publishContactFlow,
   publishFeedbackFlow,
@@ -1013,6 +1266,8 @@ export const ALL_TOOLS = [
   publishReferralFlow,
   publishReportFlow,
   publishWaitlistFlow,
+  publishWishlistFlow,
+  setWishlistIdeaStatus,
   updateCancelDraft,
   updateContactDraft,
   updateFeedbackDraft,
@@ -1021,4 +1276,5 @@ export const ALL_TOOLS = [
   updateReferralDraft,
   updateReportDraft,
   updateWaitlistDraft,
+  updateWishlistDraft,
 ] as const;

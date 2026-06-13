@@ -1,6 +1,6 @@
 {
   "name": "@fil-technology/appmate-mcp",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "Model Context Protocol server for AppMate — lets Claude / Cursor / Codex drive your retention flows via API tokens.",
   "type": "module",
   "bin": {

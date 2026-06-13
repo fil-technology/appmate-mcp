@@ -26,7 +26,7 @@ export class AppMateApiError extends Error {
 
 export async function apiFetch<T>(
   cfg: ApiConfig,
-  method: "GET" | "POST" | "PUT" | "DELETE",
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
   path: string,
   body?: unknown,
 ): Promise<T> {
