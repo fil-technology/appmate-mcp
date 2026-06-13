@@ -1094,6 +1094,43 @@ export const listWishlistIdeas: ToolDef<
   },
 };
 
+export const createWishlistIdea: ToolDef<
+  z.ZodObject<{
+    appIdOrSlug: z.ZodString;
+    title: z.ZodString;
+    body: z.ZodOptional<z.ZodString>;
+    category: z.ZodOptional<z.ZodString>;
+    status: z.ZodOptional<
+      z.ZodEnum<["pending", "open", "planned", "in_progress", "done", "declined"]>
+    >;
+  }>
+> = {
+  name: "create_wishlist_idea",
+  description:
+    "Seed an idea onto the board as the app owner (so it isn't empty for early visitors — they can then upvote/comment). Defaults to status 'open' (visible). Use a category id from the flow config when set.",
+  inputSchema: z.object({
+    appIdOrSlug: z.string().min(1),
+    title: z.string().min(1).max(120),
+    body: z.string().max(4000).optional(),
+    category: z.string().optional(),
+    status: z
+      .enum(["pending", "open", "planned", "in_progress", "done", "declined"])
+      .optional(),
+  }),
+  handler: (input, cfg) =>
+    apiFetch(
+      cfg,
+      "POST",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/wishlist/ideas`,
+      {
+        title: input.title,
+        body: input.body,
+        category: input.category,
+        status: input.status,
+      },
+    ),
+};
+
 export const setWishlistIdeaStatus: ToolDef<
   z.ZodObject<{
     appIdOrSlug: z.ZodString;
@@ -1232,6 +1269,7 @@ export const exportWishlistCsv: ToolDef<
 // Registered alphabetically so `list_tools` reads predictably.
 export const ALL_TOOLS = [
   createApp,
+  createWishlistIdea,
   deleteWishlistComment,
   deleteWishlistIdea,
   exportOnboardingCsv,
