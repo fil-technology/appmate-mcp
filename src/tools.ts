@@ -1001,7 +1001,7 @@ export const getWishlistFlow: ToolDef<
 > = {
   name: "get_wishlist_flow",
   description:
-    "Read the published and draft wishlist (feature-request board) configs for an app. The board lives at appmate.cloud/wishlist/{appSlug}; visitors submit ideas, upvote, and comment, and the owner moderates status.",
+    "Read the published and draft wishlist (feature-request board) configs for an app. The board lives at appmate.cloud/wishlist/{appSlug}; visitors submit ideas, upvote, and comment, and the owner moderates status. NOTE for iOS apps: present the board NATIVELY via the SDK (RetentionFlow.presentWishlist(userId:) or the WishlistView screen) — do NOT link or web-view appmate.cloud/wishlist/{appSlug} inside the app. The hosted page + embed are for websites. These MCP tools configure the same flow regardless of how it's surfaced.",
   inputSchema: z.object({ appIdOrSlug: z.string().min(1) }),
   handler: (input, cfg) =>
     apiFetch(
@@ -1053,7 +1053,7 @@ export const publishWishlistFlow: ToolDef<
 > = {
   name: "publish_wishlist_flow",
   description:
-    "Promote the draft wishlist config to the live published version. Visitors at appmate.cloud/wishlist/{appSlug} see the new version immediately.",
+    "Promote the draft wishlist config to the live published version. Visitors at appmate.cloud/wishlist/{appSlug} see the new version immediately. For an iOS app, surface the board natively with the SDK (RetentionFlow.presentWishlist(userId:) / WishlistView) rather than linking this URL.",
   inputSchema: z.object({ appIdOrSlug: z.string().min(1) }),
   handler: (input, cfg) =>
     apiFetch(
