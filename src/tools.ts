@@ -750,7 +750,7 @@ export const getOnboardingFlow: ToolDef<
 > = {
   name: "get_onboarding_flow",
   description:
-    "Read the published and draft onboarding flow configs for an app. Onboarding flows are web-to-app funnels (intro → quiz/info/email-capture steps → App Store handoff) hosted at appmate.cloud/onboarding/{appSlug}. Answers + email are captured server-side; the iOS SDK recovers them on first launch via a claim token.",
+    "Read the published and draft onboarding flow configs for an app. Onboarding flows are web-to-app funnels (intro → quiz/info/email-capture steps → App Store handoff) hosted at appmate.cloud/onboarding/{appSlug}. Answers + email are captured server-side; the iOS/macOS SDK recovers them on first launch via a claim token.",
   inputSchema: z.object({ appIdOrSlug: z.string().min(1) }),
   handler: (input, cfg) =>
     apiFetch(
@@ -878,7 +878,7 @@ export const getReferralFlow: ToolDef<
 > = {
   name: "get_referral_flow",
   description:
-    "Read the published and draft referral program config for an app. Referral is a share-with-a-friend loop: each user gets a link (appmate.cloud/r/{code}) AND a short human-readable code (e.g. K7Q4-R9XP); a friend who taps the link or types the code, then installs, triggers a reward for both sides. Codes + the referral graph live server-side; the iOS SDK mints links/codes, attributes installs on first launch (clipboard handoff) or via a typed code, and reports rewards owed.",
+    "Read the published and draft referral program config for an app. Referral is a share-with-a-friend loop: each user gets a link (appmate.cloud/r/{code}) AND a short human-readable code (e.g. K7Q4-R9XP); a friend who taps the link or types the code, then installs, triggers a reward for both sides. Codes + the referral graph live server-side; the iOS/macOS SDK mints links/codes, attributes installs on first launch (clipboard handoff) or via a typed code, and reports rewards owed. Optional anti-abuse caps: maxRewardsPerReferrer caps rewards earned per referrer; maxInvitesPerReferrer caps how many people one referrer can invite (once reached, new friends still install but aren't credited). Both are optional — 0 or omitted = unlimited.",
   inputSchema: z.object({ appIdOrSlug: z.string().min(1) }),
   handler: (input, cfg) =>
     apiFetch(
