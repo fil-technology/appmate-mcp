@@ -1274,8 +1274,77 @@ export const exportWishlistCsv: ToolDef<
 };
 
 // Registered alphabetically so `list_tools` reads predictably.
+// ── QR codes ──────────────────────────────────────────────────────────────
+
+// Derive the public apex host (where /api/public/qr is canonical) from the API
+// base URL by dropping a leading flow./cancel./signup. label.
+function qrPublicBase(baseUrl: string): string {
+  try {
+    const u = new URL(baseUrl);
+    u.hostname = u.hostname.replace(/^(flow|cancel|signup)\./, "");
+    return u.origin;
+  } catch {
+    return baseUrl.replace(/\/$/, "");
+  }
+}
+
+const qrInput = z.object({
+  appIdOrSlug: z.string().min(1).describe("The app's cuid id or slug."),
+  flow: z
+    .enum([
+      "cancel",
+      "waitlist",
+      "feedback",
+      "report",
+      "contact",
+      "onboarding",
+      "wishlist",
+      "link",
+      "referral",
+    ])
+    .describe("Which flow's public page the QR should open."),
+  theme: z
+    .enum(["auto", "light", "dark"])
+    .optional()
+    .describe("QR colour scheme. Default 'auto' matches the flow's colorScheme."),
+  referralCode: z
+    .string()
+    .optional()
+    .describe(
+      "For flow='referral', a referrer's code so the QR encodes that specific invite link.",
+    ),
+});
+
+export const getQrCode: ToolDef<typeof qrInput> = {
+  name: "get_qr_code",
+  description:
+    "Get shareable QR-code image URLs for a flow's public page, with the app's logo centred (rounded 'dots' style). Returns public, no-auth PNG + SVG URLs — PNG for print/raster, SVG for vector. Theme defaults to the flow's color scheme (override with light/dark). For flow='referral', pass referralCode to encode a specific invite link. The same images back the dashboard download/copy and the iOS/macOS SDK (RetentionFlow.qrCode / RetentionFlowQRView).",
+  inputSchema: qrInput,
+  handler: async (input, cfg) => {
+    const app = await apiFetch<{ slug?: string; app?: { slug?: string } }>(
+      cfg,
+      "GET",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}`,
+    );
+    const slug = app.slug ?? app.app?.slug ?? input.appIdOrSlug;
+    const params = new URLSearchParams();
+    if (input.theme && input.theme !== "auto") params.set("theme", input.theme);
+    if (input.referralCode) params.set("code", input.referralCode);
+    const extra = params.toString() ? `&${params.toString()}` : "";
+    const base = `${qrPublicBase(cfg.baseUrl)}/api/public/qr/${encodeURIComponent(slug)}/${input.flow}`;
+    return {
+      app: slug,
+      flow: input.flow,
+      pngUrl: `${base}?format=png&size=1024${extra}`,
+      svgUrl: `${base}?format=svg${extra}`,
+      note: "Public image URLs (no auth). Embed or share directly. The QR encodes the flow's public page and centres the app logo.",
+    };
+  },
+};
+
 export const ALL_TOOLS = [
   createApp,
+  getQrCode,
   createWishlistIdea,
   deleteWishlistComment,
   deleteWishlistIdea,

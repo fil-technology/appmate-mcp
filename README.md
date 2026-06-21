@@ -60,6 +60,7 @@ staging or self-hosted instances.
 | `list_apps` | List every app the token can see. |
 | `get_app` | Fetch one app by id or slug. |
 | `create_app` | Create a new app. |
+| `get_qr_code` | Shareable QR-code image URLs (PNG + SVG) for any flow's public page, logo centred. |
 | `get_cancel_flow` | Read published + draft cancel config. |
 | `update_cancel_draft` | Replace the draft with new config JSON. |
 | `publish_cancel_flow` | Promote the draft live. |
