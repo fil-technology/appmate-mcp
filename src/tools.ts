@@ -51,6 +51,33 @@ const updateDraftInput = z.object({
   ),
 });
 
+// cancel + waitlist support MULTIPLE flows per app (a primary + secondaries).
+// `flowSlug` targets a secondary (omit = primary); a fresh slug creates one.
+// The other flow types are one-per-app and ignore it.
+const multiFlowInput = z.object({
+  appIdOrSlug: z.string().min(1),
+  flowSlug: z
+    .string()
+    .optional()
+    .describe(
+      "cancel/waitlist only — target a secondary flow by slug (omit for the primary; a new slug creates one). Call list_flows to see existing slugs.",
+    ),
+});
+const updateMultiDraftInput = updateDraftInput.extend({
+  flowSlug: multiFlowInput.shape.flowSlug,
+});
+
+// Build a /flows/{type} path with an optional ?flowSlug and sub-path (/publish).
+function flowPath(
+  appIdOrSlug: string,
+  type: string,
+  flowSlug?: string,
+  suffix = "",
+): string {
+  const base = `/api/v1/apps/${encodeURIComponent(appIdOrSlug)}/flows/${type}${suffix}`;
+  return flowSlug ? `${base}?flowSlug=${encodeURIComponent(flowSlug)}` : base;
+}
+
 // ─── Apps ───────────────────────────────────────────────────────────────────
 
 export const listApps: ToolDef<z.ZodObject<{}>> = {
@@ -110,19 +137,13 @@ export const createApp: ToolDef<
 
 // ─── Pre-cancel flow ────────────────────────────────────────────────────────
 
-export const getCancelFlow: ToolDef<
-  z.ZodObject<{ appIdOrSlug: z.ZodString }>
-> = {
+export const getCancelFlow: ToolDef<typeof multiFlowInput> = {
   name: "get_cancel_flow",
   description:
-    "Read the published and draft cancel flow configs for an app.",
-  inputSchema: z.object({ appIdOrSlug: z.string().min(1) }),
+    "Read the published and draft cancel flow configs. An app can have MULTIPLE cancel flows — pass flowSlug for a secondary (omit for the primary); call list_flows to see existing slugs.",
+  inputSchema: multiFlowInput,
   handler: (input, cfg) =>
-    apiFetch(
-      cfg,
-      "GET",
-      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/flows/cancel`,
-    ),
+    apiFetch(cfg, "GET", flowPath(input.appIdOrSlug, "cancel", input.flowSlug)),
 };
 
 // `config` is the full flow-config object (advertised as type:object via
@@ -131,11 +152,11 @@ export const getCancelFlow: ToolDef<
 // `warnings` array on success for soft mismatches (e.g. showThanksScreen + a
 // "Contact support" label).
 export const updateCancelDraft: ToolDef<
-  typeof updateDraftInput
+  typeof updateMultiDraftInput
 > = {
   name: "update_cancel_draft",
   description: [
-    "Replace the draft cancel flow config. Body MUST be a full cancel config object (type: 'cancel').",
+    "Replace the draft cancel flow config. Body MUST be a full cancel config object (type: 'cancel'). An app can have MULTIPLE cancel flows — pass flowSlug to target/create a secondary (omit for the primary; list_flows shows existing ones).",
     "",
     "Required shape (paste-and-fill):",
     "  {",
@@ -183,53 +204,46 @@ export const updateCancelDraft: ToolDef<
     "",
     "See https://docs.appmate.cloud/ai-agents for the full do/don't guide and examples.",
   ].join("\n"),
-  inputSchema: updateDraftInput,
+  inputSchema: updateMultiDraftInput,
   handler: (input, cfg) =>
     apiFetch(
       cfg,
       "PUT",
-      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/flows/cancel`,
+      flowPath(input.appIdOrSlug, "cancel", input.flowSlug),
       input.config,
     ),
 };
 
-export const publishCancelFlow: ToolDef<
-  z.ZodObject<{ appIdOrSlug: z.ZodString }>
-> = {
+export const publishCancelFlow: ToolDef<typeof multiFlowInput> = {
   name: "publish_cancel_flow",
   description:
-    "Promote the draft cancel config to the live published version. The live cancel URL flips on success. ALWAYS review the warnings array returned from the most recent update_cancel_draft call and fix any reported issues BEFORE publishing — publishing locks the broken flow in front of real users.",
-  inputSchema: z.object({ appIdOrSlug: z.string().min(1) }),
+    "Promote the draft cancel config to the live published version. The live cancel URL flips on success. Pass flowSlug to publish a secondary cancel flow (omit for the primary). ALWAYS review the warnings array returned from the most recent update_cancel_draft call and fix any reported issues BEFORE publishing — publishing locks the broken flow in front of real users.",
+  inputSchema: multiFlowInput,
   handler: (input, cfg) =>
     apiFetch(
       cfg,
       "POST",
-      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/flows/cancel/publish`,
+      flowPath(input.appIdOrSlug, "cancel", input.flowSlug, "/publish"),
     ),
 };
 
 // ─── Waitlist flow ──────────────────────────────────────────────────────────
 
-export const getWaitlistFlow: ToolDef<
-  z.ZodObject<{ appIdOrSlug: z.ZodString }>
-> = {
+export const getWaitlistFlow: ToolDef<typeof multiFlowInput> = {
   name: "get_waitlist_flow",
-  description: "Read the published and draft waitlist flow configs for an app.",
-  inputSchema: z.object({ appIdOrSlug: z.string().min(1) }),
+  description:
+    "Read the published and draft waitlist flow configs. An app can have MULTIPLE waitlists — pass flowSlug for a secondary (omit for the primary); call list_flows to see existing slugs.",
+  inputSchema: multiFlowInput,
   handler: (input, cfg) =>
-    apiFetch(
-      cfg,
-      "GET",
-      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/flows/waitlist`,
-    ),
+    apiFetch(cfg, "GET", flowPath(input.appIdOrSlug, "waitlist", input.flowSlug)),
 };
 
 export const updateWaitlistDraft: ToolDef<
-  typeof updateDraftInput
+  typeof updateMultiDraftInput
 > = {
   name: "update_waitlist_draft",
   description: [
-    "Replace the draft waitlist config. Body MUST be a full waitlist config object (type: 'waitlist').",
+    "Replace the draft waitlist config. Body MUST be a full waitlist config object (type: 'waitlist'). An app can have MULTIPLE waitlists — pass flowSlug to target/create a secondary (omit for the primary; list_flows shows existing ones).",
     "",
     "The public URL at signup.appmate.cloud/{slug} renders a FULL landing",
     "page — not just a form. The `hero` block drives the visual treatment;",
@@ -282,27 +296,26 @@ export const updateWaitlistDraft: ToolDef<
     "Server returns { ok:true, warnings: [...] } — check warnings before publishing.",
     "Common warnings: partial_cta (label without url, or vice versa).",
   ].join("\n"),
-  inputSchema: updateDraftInput,
+  inputSchema: updateMultiDraftInput,
   handler: (input, cfg) =>
     apiFetch(
       cfg,
       "PUT",
-      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/flows/waitlist`,
+      flowPath(input.appIdOrSlug, "waitlist", input.flowSlug),
       input.config,
     ),
 };
 
-export const publishWaitlistFlow: ToolDef<
-  z.ZodObject<{ appIdOrSlug: z.ZodString }>
-> = {
+export const publishWaitlistFlow: ToolDef<typeof multiFlowInput> = {
   name: "publish_waitlist_flow",
-  description: "Promote the draft waitlist config to the live published version.",
-  inputSchema: z.object({ appIdOrSlug: z.string().min(1) }),
+  description:
+    "Promote the draft waitlist config to the live published version. Pass flowSlug to publish a secondary waitlist (omit for the primary).",
+  inputSchema: multiFlowInput,
   handler: (input, cfg) =>
     apiFetch(
       cfg,
       "POST",
-      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/flows/waitlist/publish`,
+      flowPath(input.appIdOrSlug, "waitlist", input.flowSlug, "/publish"),
     ),
 };
 
@@ -1342,9 +1355,28 @@ export const getQrCode: ToolDef<typeof qrInput> = {
   },
 };
 
+export const listFlows: ToolDef<
+  z.ZodObject<{ appIdOrSlug: z.ZodString; type: z.ZodOptional<z.ZodString> }>
+> = {
+  name: "list_flows",
+  description:
+    "List every flow for an app: id, type, slug, name, status, isPrimary. cancel + waitlist can have MULTIPLE flows per app (the primary plus secondaries at /{appSlug}/{slug}); all other types are one per app. Pass a returned slug as flowSlug on get_/update_/publish_{cancel,waitlist} to target a specific one. Optional `type` filters (e.g. 'waitlist').",
+  inputSchema: z.object({
+    appIdOrSlug: z.string().min(1),
+    type: z.string().optional(),
+  }),
+  handler: (input, cfg) =>
+    apiFetch(
+      cfg,
+      "GET",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/flows${input.type ? `?type=${encodeURIComponent(input.type)}` : ""}`,
+    ),
+};
+
 export const ALL_TOOLS = [
   createApp,
   getQrCode,
+  listFlows,
   createWishlistIdea,
   deleteWishlistComment,
   deleteWishlistIdea,

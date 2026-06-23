@@ -61,10 +61,11 @@ staging or self-hosted instances.
 | `get_app` | Fetch one app by id or slug. |
 | `create_app` | Create a new app. |
 | `get_qr_code` | Shareable QR-code image URLs (PNG + SVG) for any flow's public page, logo centred. |
-| `get_cancel_flow` | Read published + draft cancel config. |
+| `list_flows` | List an app's flows. cancel + waitlist can have **multiple** per app; others are one each. |
+| `get_cancel_flow` | Read published + draft cancel config (`flowSlug` → a secondary flow). |
 | `update_cancel_draft` | Replace the draft with new config JSON. |
 | `publish_cancel_flow` | Promote the draft live. |
-| `get_waitlist_flow` | Read published + draft waitlist config. |
+| `get_waitlist_flow` | Read published + draft waitlist config (`flowSlug` → a secondary waitlist). |
 | `update_waitlist_draft` | Replace the waitlist draft. |
 | `publish_waitlist_flow` | Promote the waitlist draft live. |
 | `list_waitlist_signups` | Paginated list (cursor + nextCursor). |
