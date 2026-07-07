@@ -78,6 +78,11 @@ staging or self-hosted instances.
 | `update_report_draft` | Replace the report draft (categorised). |
 | `publish_report_flow` | Promote the report draft live. |
 | `list_report_submissions` | Paginated, optional `category` filter. |
+| `get_crash_flow` | Read published + draft crash flow config. |
+| `update_crash_draft` | Replace the crash draft (message + optional log/email fields). |
+| `publish_crash_flow` | Promote the crash draft live. |
+| `list_crash_submissions` | Paginated crash reports incl. diagnostics; optional `status` filter. |
+| `set_crash_report_status` | Triage a crash report: new → reviewed → resolved. |
 | `get_contact_flow` | Read published + draft contact config. |
 | `update_contact_draft` | Replace the contact draft. |
 | `publish_contact_flow` | Promote the contact draft live. |

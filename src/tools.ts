@@ -579,6 +579,127 @@ export const listReportSubmissions: ToolDef<
   },
 };
 
+// ─── Crash flow ─────────────────────────────────────────────────────────────
+
+export const getCrashFlow: ToolDef<
+  z.ZodObject<{ appIdOrSlug: z.ZodString }>
+> = {
+  name: "get_crash_flow",
+  description:
+    "Read the published and draft crash flow configs for an app. Crash flows host a crash-report form (message + optional paste-a-log field + optional reply email) at appmate.cloud/crash/{appSlug}; the iOS/macOS SDK submits to the same flow with structured diagnostics (exception, stack trace, device/OS/app versions) attached.",
+  inputSchema: z.object({ appIdOrSlug: z.string().min(1) }),
+  handler: (input, cfg) =>
+    apiFetch(
+      cfg,
+      "GET",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/flows/crash`,
+    ),
+};
+
+export const updateCrashDraft: ToolDef<
+  typeof updateDraftInput
+> = {
+  name: "update_crash_draft",
+  description: [
+    "Replace the draft crash flow config. Body MUST be a full crash config object (type: 'crash').",
+    "",
+    "Shape:",
+    "  {",
+    "    type: 'crash',",
+    "    intro: {",
+    "      title, subtitle,",
+    "      messagePlaceholder,           // 'what happened?' textarea placeholder",
+    "      submitLabel,",
+    "      legal?                        // optional small print",
+    "    },",
+    "    logField?: { enabled, label?, placeholder? },  // hosted-page-only 'paste a crash log' textarea; SDK reports send structured diagnostics instead",
+    "    emailField?: { enabled, placeholder?, required? },",
+    "    success: { title, body, ctaLabel?, ctaUrl? },",
+    "    hero?: { theme?, eyebrow?, accentColor?, titleFont? }",
+    "  }",
+    "",
+    "No categories and no layout field — crash forms are single-screen. Diagnostics (exceptionName, stackTrace, osVersion, deviceModel, appVersion, …) are submission-side data sent by the SDK, not config.",
+  ].join("\n"),
+  inputSchema: updateDraftInput,
+  handler: (input, cfg) =>
+    apiFetch(
+      cfg,
+      "PUT",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/flows/crash`,
+      input.config,
+    ),
+};
+
+export const publishCrashFlow: ToolDef<
+  z.ZodObject<{ appIdOrSlug: z.ZodString }>
+> = {
+  name: "publish_crash_flow",
+  description:
+    "Promote the draft crash flow config to the live published version. Visitors at appmate.cloud/crash/{appSlug} (and SDK clients) see the new version immediately.",
+  inputSchema: z.object({ appIdOrSlug: z.string().min(1) }),
+  handler: (input, cfg) =>
+    apiFetch(
+      cfg,
+      "POST",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/flows/crash/publish`,
+    ),
+};
+
+export const listCrashSubmissions: ToolDef<
+  z.ZodObject<{
+    appIdOrSlug: z.ZodString;
+    limit: z.ZodOptional<z.ZodNumber>;
+    cursor: z.ZodOptional<z.ZodString>;
+    status: z.ZodOptional<z.ZodEnum<["new", "reviewed", "resolved"]>>;
+  }>
+> = {
+  name: "list_crash_submissions",
+  description:
+    "Paginated list of crash reports for an app. Each row: { id, message, status, reviewedAt, exceptionName, exceptionReason, stackTrace, platform, osVersion, deviceModel, appVersion, buildNumber, crashedAt, metadata, email, source, country, userAgent, createdAt }. Pass `status` ('new' | 'reviewed' | 'resolved') to scope to one triage bucket — e.g. status:'new' for everything still awaiting review.",
+  inputSchema: z.object({
+    appIdOrSlug: z.string().min(1),
+    limit: z.number().int().min(1).max(200).optional(),
+    cursor: z.string().optional(),
+    status: z.enum(["new", "reviewed", "resolved"]).optional(),
+  }),
+  handler: (input, cfg) => {
+    const qs = new URLSearchParams();
+    if (input.limit !== undefined) qs.set("limit", String(input.limit));
+    if (input.cursor) qs.set("cursor", input.cursor);
+    if (input.status) qs.set("status", input.status);
+    const tail = qs.toString() ? `?${qs.toString()}` : "";
+    return apiFetch(
+      cfg,
+      "GET",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/crash/submissions${tail}`,
+    );
+  },
+};
+
+export const setCrashReportStatus: ToolDef<
+  z.ZodObject<{
+    appIdOrSlug: z.ZodString;
+    submissionId: z.ZodString;
+    status: z.ZodEnum<["new", "reviewed", "resolved"]>;
+  }>
+> = {
+  name: "set_crash_report_status",
+  description:
+    "Move a crash report through triage: 'new' (untriaged) → 'reviewed' (seen/acknowledged) → 'resolved' (fixed or won't-fix). Setting 'new' clears reviewedAt; any other status stamps it. Get submission ids from list_crash_submissions.",
+  inputSchema: z.object({
+    appIdOrSlug: z.string().min(1),
+    submissionId: z.string().min(1),
+    status: z.enum(["new", "reviewed", "resolved"]),
+  }),
+  handler: (input, cfg) =>
+    apiFetch(
+      cfg,
+      "PATCH",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/crash/submissions/${encodeURIComponent(input.submissionId)}`,
+      { status: input.status },
+    ),
+};
+
 // ─── Contact flow ───────────────────────────────────────────────────────────
 
 export const getContactFlow: ToolDef<
@@ -1309,6 +1430,7 @@ const qrInput = z.object({
       "waitlist",
       "feedback",
       "report",
+      "crash",
       "contact",
       "onboarding",
       "wishlist",
@@ -1387,6 +1509,7 @@ export const ALL_TOOLS = [
   getApp,
   getCancelFlow,
   getContactFlow,
+  getCrashFlow,
   getFeedbackFlow,
   getLinkPageFlow,
   getOnboardingFlow,
@@ -1396,6 +1519,7 @@ export const ALL_TOOLS = [
   getWishlistFlow,
   listApps,
   listContactSubmissions,
+  listCrashSubmissions,
   listFeedbackSubmissions,
   listOnboardingSubmissions,
   listReferrals,
@@ -1406,6 +1530,7 @@ export const ALL_TOOLS = [
   postWishlistComment,
   publishCancelFlow,
   publishContactFlow,
+  publishCrashFlow,
   publishFeedbackFlow,
   publishLinkPageFlow,
   publishOnboardingFlow,
@@ -1413,9 +1538,11 @@ export const ALL_TOOLS = [
   publishReportFlow,
   publishWaitlistFlow,
   publishWishlistFlow,
+  setCrashReportStatus,
   setWishlistIdeaStatus,
   updateCancelDraft,
   updateContactDraft,
+  updateCrashDraft,
   updateFeedbackDraft,
   updateLinkPageDraft,
   updateOnboardingDraft,
