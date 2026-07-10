@@ -81,7 +81,7 @@ staging or self-hosted instances.
 | `get_crash_flow` | Read published + draft crash flow config. |
 | `update_crash_draft` | Replace the crash draft (message + optional log/email fields). |
 | `publish_crash_flow` | Promote the crash draft live. |
-| `list_crash_submissions` | Paginated crash reports incl. diagnostics; optional `status` filter. |
+| `list_crash_submissions` | Paginated crash reports incl. diagnostics + text-log `attachments`; optional `status` filter. |
 | `set_crash_report_status` | Triage a crash report: new → reviewed → resolved. |
 | `get_contact_flow` | Read published + draft contact config. |
 | `update_contact_draft` | Replace the contact draft. |

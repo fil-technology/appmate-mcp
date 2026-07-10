@@ -655,7 +655,7 @@ export const listCrashSubmissions: ToolDef<
 > = {
   name: "list_crash_submissions",
   description:
-    "Paginated list of crash reports for an app. Each row: { id, message, status, reviewedAt, exceptionName, exceptionReason, stackTrace, platform, osVersion, deviceModel, appVersion, buildNumber, crashedAt, metadata, email, source, country, userAgent, createdAt }. Pass `status` ('new' | 'reviewed' | 'resolved') to scope to one triage bucket — e.g. status:'new' for everything still awaiting review.",
+    "Paginated list of crash reports for an app. Each row: { id, message, status, reviewedAt, exceptionName, exceptionReason, stackTrace, platform, osVersion, deviceModel, appVersion, buildNumber, crashedAt, metadata, attachments, email, source, country, userAgent, createdAt }. `attachments` is an array of { name, content } text logs the SDK attached (console output, breadcrumbs, a log file). Pass `status` ('new' | 'reviewed' | 'resolved') to scope to one triage bucket — e.g. status:'new' for everything still awaiting review.",
   inputSchema: z.object({
     appIdOrSlug: z.string().min(1),
     limit: z.number().int().min(1).max(200).optional(),
