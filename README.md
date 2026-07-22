@@ -100,6 +100,19 @@ staging or self-hosted instances.
 | `get_link_page_flow` | Read published + draft link-page (link-in-bio) config. |
 | `update_link_page_draft` | Replace the link-page draft (header, icon links, link list, theme). |
 | `publish_link_page_flow` | Promote the link-page draft live (appmate.cloud/p/{appSlug}). |
+| `list_short_links` | Paginated list of the app's short links (code, `shortUrl`, destinations, `state`, clickCount). |
+| `get_short_link` | One link + click stats: real `clicks`, `byTarget` (ios/android/fallback/expired), `topCountries`, `botClicks`. |
+| `create_short_link` | Create a short link. Only `url` (the fallback) is required; `code` is optional and **immutable** after. |
+| `update_short_link` | Partial update — pass `null` to clear a field, `resetClicks: true` to zero the counter. |
+| `delete_short_link` | Permanently delete a link and its clicks (prefer `status: 'disabled'`). |
+
+Short links live at `go.appmate.cloud/{code}` and need no publish step — they
+redirect the moment they exist. `url` is the **fallback** destination (always
+required); `iosUrl` / `androidUrl` are optional per-platform overrides. A link
+can expire **by date** (`expiresAt`), **by click budget** (`maxClicks`), both,
+or neither. Link-preview fetchers (Slack, WhatsApp, iMessage…) are recorded as
+`botClicks` — never counted as real `clicks` and never charged against the
+click limit.
 
 Each referrer gets a unique link **and** a short, human-readable code (e.g.
 `K7Q4-R9XP`); a friend redeems by tapping the link or **typing the code** (no

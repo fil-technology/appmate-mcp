@@ -1495,11 +1495,317 @@ export const listFlows: ToolDef<
     ),
 };
 
+// ─── Short links ────────────────────────────────────────────────────────────
+//
+// Short links are NOT a flow: there's no draft/publish cycle, no config blob.
+// They're plain records — create one and it redirects immediately. Every path
+// segment accepts the link's cuid OR its short code, because an agent almost
+// always has the code (it's the shareable part) rather than the id.
+
+// Shared blurb so every short-link tool teaches the same model of the feature
+// without each description having to re-derive it.
+const SHORT_LINK_PRIMER = [
+  "How a short link resolves: `url` is the FALLBACK and is always required — it's where desktop, unknown platforms, and any platform without an override go. `iosUrl` and `androidUrl` are optional per-platform overrides picked from the visitor's user-agent; leave one empty and that platform falls back to `url`. Deep links (myapp://…) are valid destinations, not just https.",
+  "Expiry is two INDEPENDENT limits and you can set either, both, or neither: `expiresAt` (a date) and `maxClicks` (a click budget). Whichever trips first ends the link. When it ends, `expiredBehavior` decides what a visitor sees — 'page' shows a branded 'link ended' page (customise with `expiredMessage`), 'redirect' sends them to `expiredUrl` instead.",
+  "Every response carries a derived `state`: 'active' (redirecting now), 'disabled' (turned off by hand), 'expired' (past expiresAt), or 'limit_reached' (hit maxClicks). `state` is computed, not stored — a link with status 'active' can still report 'expired'.",
+].join("\n");
+
+const shortLinkRef = z.object({
+  appIdOrSlug: z.string().min(1).describe("The app's cuid id or slug."),
+  linkIdOrCode: z
+    .string()
+    .min(1)
+    .describe(
+      "The link's cuid id OR its short code (e.g. 'summer-sale' or 'k7q4rp') — either works.",
+    ),
+});
+
+export const listShortLinks: ToolDef<
+  z.ZodObject<{
+    appIdOrSlug: z.ZodString;
+    limit: z.ZodOptional<z.ZodNumber>;
+    cursor: z.ZodOptional<z.ZodString>;
+  }>
+> = {
+  name: "list_short_links",
+  description: [
+    "Paginated list of an app's short links, newest first. Each row: { id, code, shortUrl, name, url, iosUrl, androidUrl, status, state, expiresAt, maxClicks, clickCount, expiredBehavior, expiredUrl, expiredMessage, createdAt, updatedAt }. limit max 200, default 50; pass the returned `nextCursor` back for the next page.",
+    "",
+    "`shortUrl` is the ready-to-share URL — hand that to the user, not the raw code. `clickCount` here is the running total used for the click limit; call get_short_link for the click breakdown by platform and country.",
+    "",
+    SHORT_LINK_PRIMER,
+  ].join("\n"),
+  inputSchema: z.object({
+    appIdOrSlug: z.string().min(1),
+    limit: z.number().int().min(1).max(200).optional(),
+    cursor: z.string().optional(),
+  }),
+  handler: (input, cfg) => {
+    const qs = new URLSearchParams();
+    if (input.limit !== undefined) qs.set("limit", String(input.limit));
+    if (input.cursor) qs.set("cursor", input.cursor);
+    const tail = qs.toString() ? `?${qs.toString()}` : "";
+    return apiFetch(
+      cfg,
+      "GET",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/links${tail}`,
+    );
+  },
+};
+
+export const getShortLink: ToolDef<typeof shortLinkRef> = {
+  name: "get_short_link",
+  description: [
+    "Fetch one short link plus its click analytics. Returns { link, stats }.",
+    "",
+    "stats = {",
+    "  clicks,        // total REAL clicks (bots excluded)",
+    "  byTarget,      // { ios, android, fallback, expired } — which destination each click resolved to",
+    "  topCountries,  // up to 10 × { country, clicks }, real clicks only",
+    "  botClicks      // link-preview fetchers (Slack, WhatsApp, iMessage, Facebook…) that unfurled the URL",
+    "}",
+    "",
+    "IMPORTANT when reporting numbers: `botClicks` are NOT people. They're counted separately, are never added to `clicks` or `byTarget`, and never burn the link's click limit. A link posted in a group chat can show a large botClicks with zero real clicks — don't present that as engagement. A high `byTarget.expired` means people are still tapping a link that has already ended.",
+    "",
+    SHORT_LINK_PRIMER,
+  ].join("\n"),
+  inputSchema: shortLinkRef,
+  handler: (input, cfg) =>
+    apiFetch(
+      cfg,
+      "GET",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/links/${encodeURIComponent(input.linkIdOrCode)}`,
+    ),
+};
+
+export const createShortLink: ToolDef<
+  z.ZodObject<{
+    appIdOrSlug: z.ZodString;
+    url: z.ZodString;
+    name: z.ZodOptional<z.ZodString>;
+    iosUrl: z.ZodOptional<z.ZodString>;
+    androidUrl: z.ZodOptional<z.ZodString>;
+    code: z.ZodOptional<z.ZodString>;
+    expiresAt: z.ZodOptional<z.ZodString>;
+    maxClicks: z.ZodOptional<z.ZodNumber>;
+    expiredBehavior: z.ZodOptional<z.ZodEnum<["page", "redirect"]>>;
+    expiredUrl: z.ZodOptional<z.ZodString>;
+    expiredMessage: z.ZodOptional<z.ZodString>;
+  }>
+> = {
+  name: "create_short_link",
+  description: [
+    "Create a short link for an app. Only `url` is required — everything else is optional. Returns the created link including `code` and the ready-to-share `shortUrl`. It redirects immediately; there is no publish step.",
+    "",
+    SHORT_LINK_PRIMER,
+    "",
+    "About `code`: OMIT IT unless the user asked for a specific vanity code. Omitted = a 6-character code is generated from an unambiguous alphabet (no 0/o, no 1/l/i) so it survives being read aloud or typed off a poster. A custom code is 3–40 chars of [a-z0-9-_], lowercased, and a handful of route-shadowing words are reserved; a code already in use returns 409. THE CODE CAN NEVER BE CHANGED afterwards — update_short_link will not touch it, so to rename you must create a new link and delete the old one (which breaks anything already shared).",
+    "",
+    "Note: new links are always created enabled. To ship one turned off, create it then call update_short_link with status:'disabled'.",
+  ].join("\n"),
+  inputSchema: z.object({
+    appIdOrSlug: z.string().min(1),
+    url: z
+      .string()
+      .min(1)
+      .describe(
+        "REQUIRED fallback destination — full URL with a scheme (https://… or a deep link like myapp://home). javascript:/data:/file: are rejected.",
+      ),
+    name: z
+      .string()
+      .max(120)
+      .optional()
+      .describe("Internal label shown in the dashboard. Defaults to 'Untitled link'."),
+    iosUrl: z
+      .string()
+      .optional()
+      .describe("Optional iOS-only destination. Omit and iOS visitors get `url`."),
+    androidUrl: z
+      .string()
+      .optional()
+      .describe("Optional Android-only destination. Omit and Android visitors get `url`."),
+    code: z
+      .string()
+      .min(3)
+      .max(40)
+      .optional()
+      .describe(
+        "Optional vanity code. Omit to auto-generate. Immutable once created — choose deliberately.",
+      ),
+    expiresAt: z
+      .string()
+      .optional()
+      .describe("Optional ISO 8601 timestamp after which the link stops redirecting."),
+    maxClicks: z
+      .number()
+      .int()
+      .min(1)
+      .optional()
+      .describe(
+        "Optional click budget (≥1). The link stops redirecting once this many REAL clicks land; bot previews don't count.",
+      ),
+    expiredBehavior: z
+      .enum(["page", "redirect"])
+      .optional()
+      .describe(
+        "What an expired/exhausted link shows. 'page' (default) = branded 'link ended' page; 'redirect' = send to expiredUrl (which then becomes required).",
+      ),
+    expiredUrl: z
+      .string()
+      .optional()
+      .describe("Destination once ended. Required when expiredBehavior is 'redirect'."),
+    expiredMessage: z
+      .string()
+      .max(300)
+      .optional()
+      .describe("Custom copy on the 'link ended' page (expiredBehavior 'page' only)."),
+  }),
+  handler: (input, cfg) => {
+    const { appIdOrSlug, ...body } = input;
+    return apiFetch(
+      cfg,
+      "POST",
+      `/api/v1/apps/${encodeURIComponent(appIdOrSlug)}/links`,
+      body,
+    );
+  },
+};
+
+// PATCH semantics: only keys actually present in the request body are touched,
+// so we must forward exactly what the caller passed and nothing else. `null`
+// is meaningful (it clears a field) and must survive; `undefined` must not be
+// sent at all.
+const UPDATABLE_LINK_FIELDS = [
+  "name",
+  "url",
+  "iosUrl",
+  "androidUrl",
+  "status",
+  "expiresAt",
+  "maxClicks",
+  "expiredBehavior",
+  "expiredUrl",
+  "expiredMessage",
+  "resetClicks",
+] as const;
+
+export const updateShortLink: ToolDef<
+  z.ZodObject<{
+    appIdOrSlug: z.ZodString;
+    linkIdOrCode: z.ZodString;
+    name: z.ZodOptional<z.ZodString>;
+    url: z.ZodOptional<z.ZodString>;
+    iosUrl: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    androidUrl: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    status: z.ZodOptional<z.ZodEnum<["active", "disabled"]>>;
+    expiresAt: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    maxClicks: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
+    expiredBehavior: z.ZodOptional<z.ZodEnum<["page", "redirect"]>>;
+    expiredUrl: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    expiredMessage: z.ZodOptional<z.ZodString>;
+    resetClicks: z.ZodOptional<z.ZodBoolean>;
+  }>
+> = {
+  name: "update_short_link",
+  description: [
+    "Partially update a short link. ONLY the fields you pass are changed — everything else is left alone, so a one-field edit is safe. The link keeps working at the same shortUrl throughout.",
+    "",
+    SHORT_LINK_PRIMER,
+    "",
+    "Clearing vs. leaving alone: pass null to CLEAR `iosUrl`, `androidUrl`, `expiresAt`, `maxClicks` or `expiredUrl` (clearing expiresAt/maxClicks removes that expiry rule and revives an ended link). Omit the field entirely to leave it untouched. `url` is the one field that can never be cleared — it's the fallback every other destination falls back to; send a replacement instead.",
+    "",
+    "`code` is NOT updatable and is rejected here: a short code is permanent once created, because it's already out in the world. To change it, create a new link and delete the old one.",
+    "",
+    "Reopening an exhausted link: pass resetClicks:true to zero the counter without deleting the recorded click history (the analytics from get_short_link are preserved). Pair it with a new maxClicks to extend the budget, or use status:'disabled' / 'active' to pause and resume a link without touching its limits at all.",
+  ].join("\n"),
+  inputSchema: z.object({
+    appIdOrSlug: z.string().min(1),
+    linkIdOrCode: z.string().min(1),
+    name: z.string().max(120).optional(),
+    url: z
+      .string()
+      .min(1)
+      .optional()
+      .describe("New fallback destination. Cannot be cleared — only replaced."),
+    iosUrl: z
+      .string()
+      .nullable()
+      .optional()
+      .describe("New iOS destination, or null to clear it (iOS then uses `url`)."),
+    androidUrl: z
+      .string()
+      .nullable()
+      .optional()
+      .describe("New Android destination, or null to clear it (Android then uses `url`)."),
+    status: z
+      .enum(["active", "disabled"])
+      .optional()
+      .describe("'disabled' stops the link redirecting immediately; 'active' resumes it."),
+    expiresAt: z
+      .string()
+      .nullable()
+      .optional()
+      .describe("New ISO 8601 expiry, or null to remove the date limit."),
+    maxClicks: z
+      .number()
+      .int()
+      .min(1)
+      .nullable()
+      .optional()
+      .describe("New click budget (≥1), or null to remove the click limit."),
+    expiredBehavior: z.enum(["page", "redirect"]).optional(),
+    expiredUrl: z
+      .string()
+      .nullable()
+      .optional()
+      .describe("Where an ended link redirects, or null to clear it."),
+    expiredMessage: z
+      .string()
+      .max(300)
+      .optional()
+      .describe("Copy on the 'link ended' page. Pass an empty string to clear it."),
+    resetClicks: z
+      .boolean()
+      .optional()
+      .describe(
+        "true zeroes clickCount (reopening a limit_reached link) while keeping the click history for analytics.",
+      ),
+  }),
+  handler: (input, cfg) => {
+    const body: Record<string, unknown> = {};
+    for (const key of UPDATABLE_LINK_FIELDS) {
+      const value = (input as Record<string, unknown>)[key];
+      if (value !== undefined) body[key] = value;
+    }
+    return apiFetch(
+      cfg,
+      "PATCH",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/links/${encodeURIComponent(input.linkIdOrCode)}`,
+      body,
+    );
+  },
+};
+
+export const deleteShortLink: ToolDef<typeof shortLinkRef> = {
+  name: "delete_short_link",
+  description:
+    "Permanently delete a short link and its recorded clicks. IRREVERSIBLE, and the code dies with it — anyone who already has the shortUrl (a printed QR, a scheduled post, an old tweet) gets a dead link, and the code may later be claimed by someone else. Prefer update_short_link with status:'disabled' to switch a link off while keeping the code reserved and the analytics readable. Returns { deleted, id, code }.",
+  inputSchema: shortLinkRef,
+  handler: (input, cfg) =>
+    apiFetch(
+      cfg,
+      "DELETE",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/links/${encodeURIComponent(input.linkIdOrCode)}`,
+    ),
+};
+
 export const ALL_TOOLS = [
   createApp,
   getQrCode,
   listFlows,
+  createShortLink,
   createWishlistIdea,
+  deleteShortLink,
   deleteWishlistComment,
   deleteWishlistIdea,
   exportOnboardingCsv,
@@ -1515,6 +1821,7 @@ export const ALL_TOOLS = [
   getOnboardingFlow,
   getReferralFlow,
   getReportFlow,
+  getShortLink,
   getWaitlistFlow,
   getWishlistFlow,
   listApps,
@@ -1524,6 +1831,7 @@ export const ALL_TOOLS = [
   listOnboardingSubmissions,
   listReferrals,
   listReportSubmissions,
+  listShortLinks,
   listWaitlistSignups,
   listWishlistComments,
   listWishlistIdeas,
@@ -1548,6 +1856,7 @@ export const ALL_TOOLS = [
   updateOnboardingDraft,
   updateReferralDraft,
   updateReportDraft,
+  updateShortLink,
   updateWaitlistDraft,
   updateWishlistDraft,
 ] as const;

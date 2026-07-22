@@ -130,7 +130,13 @@ function zodToJsonSchema(schema: z.ZodTypeAny): JsonSchema {
     const required: string[] = [];
     for (const [k, v] of Object.entries(shape)) {
       const inner = unwrapOptional(v);
-      properties[k] = zodToJsonSchema(inner.schema);
+      const prop = zodToJsonSchema(inner.schema);
+      // `.describe()` may sit on either the optional wrapper or the inner
+      // schema depending on call order — take whichever has it. Without this
+      // per-field docs never reach the host and the model flies blind.
+      const description = v.description ?? inner.schema.description;
+      if (description) prop.description = description;
+      properties[k] = prop;
       if (!inner.optional) required.push(k);
     }
     const out: JsonSchema = {
@@ -140,6 +146,20 @@ function zodToJsonSchema(schema: z.ZodTypeAny): JsonSchema {
     };
     if (required.length) out.required = required;
     return out;
+  }
+  // Enums must advertise their members — otherwise the host sees an untyped
+  // field and the model has to guess the allowed strings from prose.
+  if (schema instanceof z.ZodEnum) {
+    return { type: "string", enum: [...(schema.options as string[])] };
+  }
+  // `null` is load-bearing in our PATCH bodies (it CLEARS a field, as opposed
+  // to omitting the key, which leaves it untouched), so the schema has to say
+  // null is acceptable.
+  if (schema instanceof z.ZodNullable) {
+    const inner = zodToJsonSchema(schema._def.innerType as z.ZodTypeAny);
+    const t = inner.type;
+    if (typeof t === "string") return { ...inner, type: [t, "null"] };
+    return inner;
   }
   if (schema instanceof z.ZodString) {
     return { type: "string" };
