@@ -700,6 +700,81 @@ export const setCrashReportStatus: ToolDef<
     ),
 };
 
+// ─── App promotion (cross-app promotion) flow ───────────────────────────────
+// A source app promotes one (single) or many (rotating) destination apps
+// already in the same account. No hosted web page, no submissions — the SDK
+// requests a placement and the backend returns a decision (Slice 3+). These
+// tools manage the flow DEFINITION only. Multi-flow: one flow per placement,
+// so they take flowSlug like cancel/waitlist.
+
+export const getAppPromotionFlow: ToolDef<typeof multiFlowInput> = {
+  name: "get_app_promotion_flow",
+  description:
+    "Read the published and draft cross-app promotion (app_promotion) config for an app. A promotion promotes OTHER apps in the same account as destinations. An app can have MULTIPLE promotion flows — one per placement — so pass flowSlug for a specific one (omit for the default 'promotion'); call list_flows to see slugs.",
+  inputSchema: multiFlowInput,
+  handler: (input, cfg) =>
+    apiFetch(
+      cfg,
+      "GET",
+      flowPath(input.appIdOrSlug, "app-promotion", input.flowSlug),
+    ),
+};
+
+export const updateAppPromotionDraft: ToolDef<typeof updateMultiDraftInput> = {
+  name: "update_app_promotion_draft",
+  description: [
+    "Replace the draft cross-app promotion config. Body MUST be a full config object (type: 'app_promotion'). Multi-flow — pass flowSlug to target/create a specific placement (omit for the default 'promotion').",
+    "",
+    "Shape:",
+    "  {",
+    "    type: 'app_promotion',",
+    "    placement,                       // snake_case product moment the SDK requests, e.g. 'cleaning_completed'",
+    "    mode: 'single' | 'rotating',",
+    "    rotationStrategy?: 'smart' | 'even' | 'weighted',   // default 'smart'",
+    "    presentation: 'apple_native' | 'custom_card_then_apple_native' | 'store_product_page',",
+    "    destinations: [{",
+    "      destinationAppId,              // an App in THIS account (id) to promote",
+    "      enabled?, priority?, weight?,  // weight ⇒ weighted rotation",
+    "      startAt?, endAt?,              // ISO availability window",
+    "      countries?, languages?,        // per-destination targeting overrides",
+    "      maxImpressions?, cooldownDays?,",
+    "      content?: { headline?, body?, cta?, artworkUrl? },",
+    "      localizations?: { [locale]: { headline?, body?, cta?, artworkUrl? } },",
+    "      installedAction?: { type: 'open_home'|'named_destination'|'universal_link'|'custom_scheme'|'none', destinationKey?, universalUrl?, customSchemeUrl?, fallback?, webFallbackUrl? },",
+    "      notInstalledAction?: { type: 'sk_overlay'|'store_product_page'|'app_store_url' },",
+    "      deferredAction?: { enabled, route?, expiresAfterHours?, fallbackRoute?, minAppVersion? }",
+    "    }],",
+    "    defaultInstalledAction?, defaultNotInstalledAction?,   // applied when a destination omits its own",
+    "    targeting?: { platforms?, countries?, languages?, minAppVersion?, maxAppVersion?, startAt?, endAt? },",
+    "    frequency?: { cooldownDays?, lifetimeImpressions?, avoidImmediateRepeat? },   // defaults 14 / 4 / true",
+    "    defaultLocale?, card?: { dismissLabel?, ctaLabel? }",
+    "  }",
+    "",
+    "Destination apps come from the same AppMate account and expose reusable metadata (App Store id/URL, universalLinkBase, named deepLinkDestinations) on the App itself — you don't re-enter it here, you reference destinationAppId. named_destination.destinationKey must be a key from that app's deepLinkDestinations.",
+  ].join("\n"),
+  inputSchema: updateMultiDraftInput,
+  handler: (input, cfg) =>
+    apiFetch(
+      cfg,
+      "PUT",
+      flowPath(input.appIdOrSlug, "app-promotion", input.flowSlug),
+      input.config,
+    ),
+};
+
+export const publishAppPromotionFlow: ToolDef<typeof multiFlowInput> = {
+  name: "publish_app_promotion_flow",
+  description:
+    "Promote the draft cross-app promotion config to the live published version. SDK placement requests resolve against the new version immediately. Pass flowSlug to publish a specific placement (omit for the default 'promotion').",
+  inputSchema: multiFlowInput,
+  handler: (input, cfg) =>
+    apiFetch(
+      cfg,
+      "POST",
+      flowPath(input.appIdOrSlug, "app-promotion", input.flowSlug, "/publish"),
+    ),
+};
+
 // ─── Contact flow ───────────────────────────────────────────────────────────
 
 export const getContactFlow: ToolDef<
@@ -1813,6 +1888,7 @@ export const ALL_TOOLS = [
   exportWaitlistCsv,
   exportWishlistCsv,
   getApp,
+  getAppPromotionFlow,
   getCancelFlow,
   getContactFlow,
   getCrashFlow,
@@ -1844,10 +1920,12 @@ export const ALL_TOOLS = [
   publishOnboardingFlow,
   publishReferralFlow,
   publishReportFlow,
+  publishAppPromotionFlow,
   publishWaitlistFlow,
   publishWishlistFlow,
   setCrashReportStatus,
   setWishlistIdeaStatus,
+  updateAppPromotionDraft,
   updateCancelDraft,
   updateContactDraft,
   updateCrashDraft,
