@@ -61,7 +61,7 @@ staging or self-hosted instances.
 | `get_app` | Fetch one app by id or slug. |
 | `create_app` | Create a new app. |
 | `get_qr_code` | Shareable QR-code image URLs (PNG + SVG) for any flow's public page, logo centred. |
-| `list_flows` | List an app's flows. cancel + waitlist can have **multiple** per app; others are one each. |
+| `list_flows` | List an app's flows. cancel, waitlist + app_promotion can have **multiple** per app (a promotion per placement); others are one each. |
 | `get_cancel_flow` | Read published + draft cancel config (`flowSlug` → a secondary flow). |
 | `update_cancel_draft` | Replace the draft with new config JSON. |
 | `publish_cancel_flow` | Promote the draft live. |
@@ -100,6 +100,9 @@ staging or self-hosted instances.
 | `get_link_page_flow` | Read published + draft link-page (link-in-bio) config. |
 | `update_link_page_draft` | Replace the link-page draft (header, icon links, link list, theme). |
 | `publish_link_page_flow` | Promote the link-page draft live (appmate.cloud/p/{appSlug}). |
+| `get_app_promotion_flow` | Read published + draft cross-app promotion config (`flowSlug` → a specific placement). |
+| `update_app_promotion_draft` | Replace the promotion draft — which of your other apps to promote (single or rotating), presentation, installed/not-installed/deferred actions, targeting, frequency. |
+| `publish_app_promotion_flow` | Promote the promotion draft live (SDK `present(placement)` resolves it). |
 | `list_short_links` | Paginated list of the app's short links (code, `shortUrl`, destinations, `state`, clickCount). |
 | `get_short_link` | One link + click stats: real `clicks`, `byTarget` (ios/android/fallback/expired), `topCountries`, `botClicks`. |
 | `create_short_link` | Create a short link. Only `url` (the fallback) is required; `code` is optional and **immutable** after. |
@@ -117,6 +120,13 @@ click limit.
 Each referrer gets a unique link **and** a short, human-readable code (e.g.
 `K7Q4-R9XP`); a friend redeems by tapping the link or **typing the code** (no
 clipboard needed). `source` on each referral row records which path was used.
+
+**Cross-app promotions** let a source app promote your *other* apps (single or
+rotating) at a named placement, shown via Apple's StoreKit in the iOS SDK
+(`RetentionFlow.promotions.present("placement")`). Destinations are referenced
+by their AppMate app id — their App Store id / universal-link base / named
+deep-link destinations live on the destination App itself, so you don't re-enter
+them. One promotion flow per placement (pass `flowSlug`).
 
 Tools that accept an app reference (`get_app`, `update_cancel_draft`,
 etc.) accept either the cuid `id` or the human-readable `slug` — use
