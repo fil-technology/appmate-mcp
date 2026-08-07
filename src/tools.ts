@@ -330,7 +330,7 @@ export const listWaitlistSignups: ToolDef<
 > = {
   name: "list_waitlist_signups",
   description:
-    "Paginated list of waitlist signups for an app. Returns up to `limit` rows (max 200, default 50) and a `nextCursor` to pass back for the next page.",
+    "Paginated list of waitlist signups for an app. Each row: { id, email, source, country, area, approxLat, approxLon, geohash, locale, platform, appVersion, userAgent, createdAt }. `area` + the approximate coordinates (rounded ~1.1 km) / geohash are present only on programmatic (SDK) signups — use them to rank demand per city for a location-based launch. Returns up to `limit` rows (max 200, default 50) and a `nextCursor` for the next page.",
   inputSchema: z.object({
     appIdOrSlug: z.string().min(1),
     limit: z.number().int().min(1).max(200).optional(),
