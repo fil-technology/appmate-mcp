@@ -775,6 +775,88 @@ export const publishAppPromotionFlow: ToolDef<typeof multiFlowInput> = {
     ),
 };
 
+// ─── Legal flow (privacy policy + terms) ────────────────────────────────────
+// Composes hosted privacy + terms pages from STRUCTURED facts (not free text),
+// so the page is correct by construction. NOT legal advice — it generates a
+// document from facts the owner asserts. Served at appmate.cloud/legal/{appSlug}
+// (privacy) + /legal/{appSlug}/terms; published versions are immutable + dated.
+
+export const getLegalFlow: ToolDef<
+  z.ZodObject<{ appIdOrSlug: z.ZodString }>
+> = {
+  name: "get_legal_flow",
+  description:
+    "Read the published + draft legal (privacy policy + terms) config for an app, plus the public URLs. The page is composed from structured facts (entity, processors, declarations, platform capabilities) — not free text.",
+  inputSchema: z.object({ appIdOrSlug: z.string().min(1) }),
+  handler: (input, cfg) =>
+    apiFetch(
+      cfg,
+      "GET",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/flows/legal`,
+    ),
+};
+
+export const updateLegalDraft: ToolDef<typeof updateDraftInput> = {
+  name: "update_legal_draft",
+  description: [
+    "Replace the draft legal config. Body MUST be a full config object (type: 'legal'). This produces a privacy policy + terms from FACTS — it is NOT legal advice, and must not be presented as such. AppMate never infers processors; the owner states them.",
+    "",
+    "Shape:",
+    "  {",
+    "    type: 'legal',",
+    "    entity: { name, contactEmail?, jurisdiction? },",
+    "    effectiveDate?: 'YYYY-MM-DD',           // stamped to today on publish if omitted",
+    "    localData?: { enabled, items: [ '…what never leaves the device' ] },",
+    "    processors: [ { id, purpose?, receives?, name?, privacyUrl? } ],  // id = preset or custom slug",
+    "    platformData?: { healthkit?: {read,write}, notifications?: 'local'|'push', icloud?, location?: 'none'|'whenInUse'|'always', camera?, photos?, contacts?, microphone? },",
+    "    declarations: { sellsData, advertising, analytics, tracking, profiling },   // the negative claims",
+    "    childrenDirected?, medicalDisclaimer?,",
+    "    terms?: { enabled, appleStandardEula?, customClauses?: [ {heading, body} ] },",
+    "    locales?, hero?",
+    "  }",
+    "",
+    "Known processor presets (name the id; purpose/receives fill in automatically): revenuecat, superwall, firebase, amplitude, posthog, sentry, mixpanel, appmate. On-device-only capabilities (local storage, on-device HealthKit/location) are NOT 'collection'. Returns { ok, warnings } — heed the warnings (missing contactEmail, unknown processor id, a cancel flow but no processors, future effectiveDate).",
+  ].join("\n"),
+  inputSchema: updateDraftInput,
+  handler: (input, cfg) =>
+    apiFetch(
+      cfg,
+      "PUT",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/flows/legal`,
+      input.config,
+    ),
+};
+
+export const publishLegalFlow: ToolDef<
+  z.ZodObject<{ appIdOrSlug: z.ZodString }>
+> = {
+  name: "publish_legal_flow",
+  description:
+    "Publish the draft legal policy. Stamps the effective date to today, freezes this version immutably (prior versions stay at /legal/{appSlug}/v/{n}), and returns both public URLs { privacy, terms }. A published page is never silently rewritten.",
+  inputSchema: z.object({ appIdOrSlug: z.string().min(1) }),
+  handler: (input, cfg) =>
+    apiFetch(
+      cfg,
+      "POST",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/flows/legal/publish`,
+    ),
+};
+
+export const getAppStorePrivacyDeclaration: ToolDef<
+  z.ZodObject<{ appIdOrSlug: z.ZodString }>
+> = {
+  name: "get_app_store_privacy_declaration",
+  description:
+    "Derive the App Store 'App Privacy' nutrition label from the legal config — the exact answers for App Store Connect's questionnaire. Returns { basis, dataNotCollected, entries: [{category, purpose, linkedToIdentity, usedForTracking, source}], unmappedProcessors }. Each entry names the processor that caused it. Prevents a common false declaration: 'Data Not Collected' while a purchases SDK is linked. Only data that leaves the device counts.",
+  inputSchema: z.object({ appIdOrSlug: z.string().min(1) }),
+  handler: (input, cfg) =>
+    apiFetch(
+      cfg,
+      "GET",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/legal/app-store-privacy`,
+    ),
+};
+
 // ─── Contact flow ───────────────────────────────────────────────────────────
 
 export const getContactFlow: ToolDef<
@@ -1889,10 +1971,12 @@ export const ALL_TOOLS = [
   exportWishlistCsv,
   getApp,
   getAppPromotionFlow,
+  getAppStorePrivacyDeclaration,
   getCancelFlow,
   getContactFlow,
   getCrashFlow,
   getFeedbackFlow,
+  getLegalFlow,
   getLinkPageFlow,
   getOnboardingFlow,
   getReferralFlow,
@@ -1921,6 +2005,7 @@ export const ALL_TOOLS = [
   publishReferralFlow,
   publishReportFlow,
   publishAppPromotionFlow,
+  publishLegalFlow,
   publishWaitlistFlow,
   publishWishlistFlow,
   setCrashReportStatus,
@@ -1929,6 +2014,7 @@ export const ALL_TOOLS = [
   updateCancelDraft,
   updateContactDraft,
   updateCrashDraft,
+  updateLegalDraft,
   updateFeedbackDraft,
   updateLinkPageDraft,
   updateOnboardingDraft,

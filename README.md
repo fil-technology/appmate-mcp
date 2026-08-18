@@ -100,6 +100,10 @@ staging or self-hosted instances.
 | `get_link_page_flow` | Read published + draft link-page (link-in-bio) config. |
 | `update_link_page_draft` | Replace the link-page draft (header, icon links, link list, theme). |
 | `publish_link_page_flow` | Promote the link-page draft live (appmate.cloud/p/{appSlug}). |
+| `get_legal_flow` | Read published + draft privacy-policy/terms config + public URLs. |
+| `update_legal_draft` | Replace the legal draft — structured facts (entity, processors, declarations, platform capabilities). Returns `warnings`. NOT legal advice. |
+| `publish_legal_flow` | Publish; stamps today's date, freezes the version, returns { privacy, terms } URLs. |
+| `get_app_store_privacy_declaration` | Derive the App Store "App Privacy" answers from the config; each entry names the processor that caused it. |
 | `get_app_promotion_flow` | Read published + draft cross-app promotion config (`flowSlug` → a specific placement). |
 | `update_app_promotion_draft` | Replace the promotion draft — which of your other apps to promote (single or rotating), presentation, installed/not-installed/deferred actions, targeting, frequency. |
 | `publish_app_promotion_flow` | Promote the promotion draft live (SDK `present(placement)` resolves it). |
