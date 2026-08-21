@@ -1034,6 +1034,32 @@ export const listContactSubmissions: ToolDef<
   },
 };
 
+export const replyToContactSubmission: ToolDef<
+  z.ZodObject<{
+    appIdOrSlug: z.ZodString;
+    submissionId: z.ZodString;
+    subject: z.ZodString;
+    body: z.ZodString;
+  }>
+> = {
+  name: "reply_to_contact_submission",
+  description:
+    "Send a branded email reply to a contact submission, from AppMate. The email is sent from the app-branded AppMate address; Reply-To is the app's support email (or the account email) so the person's reply reaches a real inbox. Counts against the daily email quota. Get submission ids + the sender's name/email from list_contact_submissions. Pass FINAL text — tokens are not substituted here. Returns { ok, mode } (mode 'logged' means no email provider is configured, but the reply was recorded).",
+  inputSchema: z.object({
+    appIdOrSlug: z.string().min(1),
+    submissionId: z.string().min(1),
+    subject: z.string().min(1).max(200),
+    body: z.string().min(1).max(8000),
+  }),
+  handler: (input, cfg) =>
+    apiFetch(
+      cfg,
+      "POST",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/contact/submissions/${encodeURIComponent(input.submissionId)}/reply`,
+      { subject: input.subject, body: input.body },
+    ),
+};
+
 // ─── Onboarding flow (web-to-app funnel) ─────────────────────────────────────
 
 export const getOnboardingFlow: ToolDef<
@@ -2008,6 +2034,7 @@ export const ALL_TOOLS = [
   publishLegalFlow,
   publishWaitlistFlow,
   publishWishlistFlow,
+  replyToContactSubmission,
   setCrashReportStatus,
   setWishlistIdeaStatus,
   updateAppPromotionDraft,

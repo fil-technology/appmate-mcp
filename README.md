@@ -87,6 +87,7 @@ staging or self-hosted instances.
 | `update_contact_draft` | Replace the contact draft. |
 | `publish_contact_flow` | Promote the contact draft live. |
 | `list_contact_submissions` | Paginated list of contact rows (name + email + message). |
+| `reply_to_contact_submission` | Send a branded email reply to a contact submission (Reply-To = the app's support email / account email). Counts against the email quota. |
 | `get_onboarding_flow` | Read published + draft onboarding (web-to-app funnel) config. |
 | `update_onboarding_draft` | Replace the onboarding draft (quiz / info / email-capture steps + handoff). |
 | `publish_onboarding_flow` | Promote the onboarding draft live. |
