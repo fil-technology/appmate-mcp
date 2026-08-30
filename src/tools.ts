@@ -579,6 +579,32 @@ export const listReportSubmissions: ToolDef<
   },
 };
 
+export const replyToReportSubmission: ToolDef<
+  z.ZodObject<{
+    appIdOrSlug: z.ZodString;
+    submissionId: z.ZodString;
+    subject: z.ZodString;
+    body: z.ZodString;
+  }>
+> = {
+  name: "reply_to_report_submission",
+  description:
+    "Send a branded email reply to a report submission (bug/abuse/spam), from AppMate. Same send path + quota + Reply-To as reply_to_contact_submission. Get submission ids + the reporter's email from list_report_submissions. Reports carry no name — greet generically. Returns { ok, mode }.",
+  inputSchema: z.object({
+    appIdOrSlug: z.string().min(1),
+    submissionId: z.string().min(1),
+    subject: z.string().min(1).max(200),
+    body: z.string().min(1).max(8000),
+  }),
+  handler: (input, cfg) =>
+    apiFetch(
+      cfg,
+      "POST",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/report/submissions/${encodeURIComponent(input.submissionId)}/reply`,
+      { subject: input.subject, body: input.body },
+    ),
+};
+
 // ─── Crash flow ─────────────────────────────────────────────────────────────
 
 export const getCrashFlow: ToolDef<
@@ -2035,6 +2061,7 @@ export const ALL_TOOLS = [
   publishWaitlistFlow,
   publishWishlistFlow,
   replyToContactSubmission,
+  replyToReportSubmission,
   setCrashReportStatus,
   setWishlistIdeaStatus,
   updateAppPromotionDraft,
