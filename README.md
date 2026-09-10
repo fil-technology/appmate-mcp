@@ -74,6 +74,7 @@ staging or self-hosted instances.
 | `update_feedback_draft` | Replace the feedback draft. |
 | `publish_feedback_flow` | Promote the feedback draft live. |
 | `list_feedback_submissions` | Paginated list of feedback rows (rating + message + email). |
+| `reply_to_feedback_submission` | Send a branded email reply to a feedback submission (Reply-To = the app's support email / account email). Feedback is anonymous by default — only rows with an email can be replied to. Counts against the email quota. |
 | `get_report_flow` | Read published + draft report config. |
 | `update_report_draft` | Replace the report draft (categorised). |
 | `publish_report_flow` | Promote the report draft live. |

@@ -605,6 +605,32 @@ export const replyToReportSubmission: ToolDef<
     ),
 };
 
+export const replyToFeedbackSubmission: ToolDef<
+  z.ZodObject<{
+    appIdOrSlug: z.ZodString;
+    submissionId: z.ZodString;
+    subject: z.ZodString;
+    body: z.ZodString;
+  }>
+> = {
+  name: "reply_to_feedback_submission",
+  description:
+    "Send a branded email reply to a feedback submission (a rating + message), from AppMate. Same send path + quota + Reply-To as reply_to_contact_submission. Get submission ids + the reviewer's email from list_feedback_submissions — feedback is anonymous by default, so many rows have no email and can't be replied to. Returns { ok, mode }.",
+  inputSchema: z.object({
+    appIdOrSlug: z.string().min(1),
+    submissionId: z.string().min(1),
+    subject: z.string().min(1).max(200),
+    body: z.string().min(1).max(8000),
+  }),
+  handler: (input, cfg) =>
+    apiFetch(
+      cfg,
+      "POST",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/feedback/submissions/${encodeURIComponent(input.submissionId)}/reply`,
+      { subject: input.subject, body: input.body },
+    ),
+};
+
 // ─── Crash flow ─────────────────────────────────────────────────────────────
 
 export const getCrashFlow: ToolDef<
@@ -2062,6 +2088,7 @@ export const ALL_TOOLS = [
   publishWishlistFlow,
   replyToContactSubmission,
   replyToReportSubmission,
+  replyToFeedbackSubmission,
   setCrashReportStatus,
   setWishlistIdeaStatus,
   updateAppPromotionDraft,
