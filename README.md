@@ -107,6 +107,9 @@ staging or self-hosted instances.
 | `update_legal_draft` | Replace the legal draft — structured facts (entity, processors, declarations, platform capabilities). Returns `warnings`. NOT legal advice. |
 | `publish_legal_flow` | Publish; stamps today's date, freezes the version, returns { privacy, terms } URLs. |
 | `get_app_store_privacy_declaration` | Derive the App Store "App Privacy" answers from the config; each entry names the processor that caused it. |
+| `get_retention_messaging_flow` | Read published + draft Apple Retention Messaging config + the per-app endpoint URL to register with Apple. |
+| `update_retention_messaging_draft` | Replace the retention-messaging draft — a catalog of messages (header/body/bullets) + selection rules (productIds/locales → message). |
+| `publish_retention_messaging_flow` | Publish the catalog; the per-app endpoint then serves it. Messages display only once Apple marks them APPROVED. |
 | `get_app_promotion_flow` | Read published + draft cross-app promotion config (`flowSlug` → a specific placement). |
 | `update_app_promotion_draft` | Replace the promotion draft — which of your other apps to promote (single or rotating), presentation, installed/not-installed/deferred actions, targeting, frequency. |
 | `publish_app_promotion_flow` | Promote the promotion draft live (SDK `present(placement)` resolves it). |

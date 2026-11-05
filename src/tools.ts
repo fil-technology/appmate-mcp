@@ -894,6 +894,69 @@ export const publishLegalFlow: ToolDef<
     ),
 };
 
+export const getRetentionMessagingFlow: ToolDef<
+  z.ZodObject<{ appIdOrSlug: z.ZodString }>
+> = {
+  name: "get_retention_messaging_flow",
+  description:
+    "Read the published + draft Apple Retention Messaging config for an app, plus the per-app endpoint URL to register with Apple. The config is a catalog of messages (mirroring Apple-side uploaded messages) + selection rules; the endpoint returns the chosen message to Apple when a subscriber is about to cancel. Pre-release: needs Apple to grant Retention Messaging API access, and each message must be uploaded + APPROVED on Apple's side before it displays.",
+  inputSchema: z.object({ appIdOrSlug: z.string().min(1) }),
+  handler: (input, cfg) =>
+    apiFetch(
+      cfg,
+      "GET",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/flows/retention-messaging`,
+    ),
+};
+
+export const updateRetentionMessagingDraft: ToolDef<typeof updateDraftInput> = {
+  name: "update_retention_messaging_draft",
+  description: [
+    "Replace the draft Apple Retention Messaging config. Body MUST be a full config object (type: 'retention_messaging').",
+    "",
+    "Shape:",
+    "  {",
+    "    type: 'retention_messaging',",
+    "    messages: [ {",
+    "      ref,                       // stable snake_case local id used by rules",
+    "      kind: 'text',              // text (optionally with bulletPoints)",
+    "      header,                    // <= 66 chars (Apple limit)",
+    "      body,                      // <= 144 chars (Apple limit)",
+    "      bulletPoints?: [ '…' ],    // up to 5",
+    "      headerPosition?: 'ABOVE_BODY' | 'ABOVE_IMAGE',",
+    "      apple?: { messageIdentifier?, messageState?: 'DRAFT'|'PENDING'|'APPROVED'|'REJECTED' }",
+    "    } ],",
+    "    rules?: [ { productIds?: [..], locales?: [..], messageRef } ],  // first match wins; empty = any",
+    "    defaultMessageRef?",
+    "  }",
+    "",
+    "The endpoint only RETURNS a message once it has an apple.messageIdentifier and messageState 'APPROVED' (set by the Apple upload step); otherwise it returns nothing and Apple shows your App Store Connect default. Authoring the catalog here is safe before Apple access is granted. Returns { ok }.",
+  ].join("\n"),
+  inputSchema: updateDraftInput,
+  handler: (input, cfg) =>
+    apiFetch(
+      cfg,
+      "PUT",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/flows/retention-messaging`,
+      input.config,
+    ),
+};
+
+export const publishRetentionMessagingFlow: ToolDef<
+  z.ZodObject<{ appIdOrSlug: z.ZodString }>
+> = {
+  name: "publish_retention_messaging_flow",
+  description:
+    "Publish the draft Retention Messaging catalog. Freezes this version; the per-app endpoint then serves it. Messages still only display to customers once Apple marks them APPROVED. Returns { ok, version }.",
+  inputSchema: z.object({ appIdOrSlug: z.string().min(1) }),
+  handler: (input, cfg) =>
+    apiFetch(
+      cfg,
+      "POST",
+      `/api/v1/apps/${encodeURIComponent(input.appIdOrSlug)}/flows/retention-messaging/publish`,
+    ),
+};
+
 export const getAppStorePrivacyDeclaration: ToolDef<
   z.ZodObject<{ appIdOrSlug: z.ZodString }>
 > = {
@@ -2050,6 +2113,9 @@ export const ALL_TOOLS = [
   getApp,
   getAppPromotionFlow,
   getAppStorePrivacyDeclaration,
+  getRetentionMessagingFlow,
+  updateRetentionMessagingDraft,
+  publishRetentionMessagingFlow,
   getCancelFlow,
   getContactFlow,
   getCrashFlow,
